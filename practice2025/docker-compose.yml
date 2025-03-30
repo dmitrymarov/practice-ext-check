@@ -1,0 +1,174 @@
+services:
+  # MediaWiki service
+  mediawiki:
+    image: mediawiki:1.39
+    container_name: support-mediawiki
+    restart: unless-stopped
+    depends_on:
+      - database
+      - opensearch-node1
+    ports:
+      - "8080:80"
+    volumes:
+      - mediawiki_data:/var/www/html/images
+      - ./extensions:/var/www/html/extensions
+      - ./LocalSettings.php:/var/www/html/LocalSettings.php
+    environment:
+      - MEDIAWIKI_DB_HOST=database
+      - MEDIAWIKI_DB_PORT=3306
+      - MEDIAWIKI_DB_NAME=mediawiki
+      - MEDIAWIKI_DB_USER=wikiuser
+      - MEDIAWIKI_DB_PASSWORD=wikipass
+      - MEDIAWIKI_ADMIN_USER=admin
+      - MEDIAWIKI_ADMIN_PASS=adminpass
+      - MEDIAWIKI_SITE_NAME=Support Knowledge Base
+    networks:
+      - support_net
+
+  # Database for MediaWiki
+  database:
+    image: mariadb:10.6
+    container_name: support-database
+    restart: unless-stopped
+    volumes:
+      - db_data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpass
+      - MYSQL_DATABASE=mediawiki
+      - MYSQL_USER=wikiuser
+      - MYSQL_PASSWORD=wikipass
+    networks:
+      - support_net
+
+  # OpenSearch for full-text search
+  opensearch-node1:
+    image: opensearchproject/opensearch:latest
+    container_name: support-opensearch1
+    environment:
+      - cluster.name=opensearch-cluster
+      - node.name=opensearch-node1
+      - discovery.seed_hosts=opensearch-node1,opensearch-node2
+      - cluster.initial_cluster_manager_nodes=opensearch-node1,opensearch-node2
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms256m -Xmx256m"
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=Asuadmin123!
+      - plugins.security.ssl.http.enabled=false
+      - plugins.security.disabled=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - opensearch_data1:/usr/share/opensearch/data
+    ports:
+      - 9200:9200
+    networks:
+      - support_net
+
+  opensearch-node2:
+    image: opensearchproject/opensearch:latest
+    container_name: support-opensearch2
+    environment:
+      - cluster.name=opensearch-cluster
+      - node.name=opensearch-node2
+      - discovery.seed_hosts=opensearch-node1,opensearch-node2
+      - cluster.initial_cluster_manager_nodes=opensearch-node1,opensearch-node2
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms256m -Xmx256m"
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=Asuadmin123!
+      - plugins.security.ssl.http.enabled=false
+      - plugins.security.disabled=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - opensearch_data2:/usr/share/opensearch/data
+    networks:
+      - support_net
+
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:latest
+    container_name: support-opensearch-dashboards
+    ports:
+      - 5601:5601
+    environment:
+      OPENSEARCH_HOSTS: '["http://opensearch-node1:9200","http://opensearch-node2:9200"]'
+      DISABLE_SECURITY_DASHBOARDS_PLUGIN: true
+    networks:
+      - support_net
+
+  # Redmine for ticket management
+  redmine:
+    image: redmine:5.0
+    container_name: support-redmine
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - redmine_data:/usr/src/redmine/files
+      - redmine_plugins:/usr/src/redmine/plugins
+    environment:
+      - REDMINE_DB_MYSQL=support-redmine-db
+      - REDMINE_DB_DATABASE=redmine
+      - REDMINE_DB_USERNAME=redmine
+      - REDMINE_DB_PASSWORD=redmine
+      - RAILS_ENV=production
+      - SECRET_KEY_BASE=someveryverylongsecretkey123456789012345678901234567890
+    depends_on:
+      - redmine-db
+    networks:
+      - support_net
+
+  # Database for Redmine
+  redmine-db:
+    image: mariadb:10.6
+    container_name: support-redmine-db
+    restart: unless-stopped
+    volumes:
+      - redmine_db_data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpass
+      - MYSQL_DATABASE=redmine
+      - MYSQL_USER=redmine
+      - MYSQL_PASSWORD=redmine
+    networks:
+      - support_net
+
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: support-ai-service
+    restart: unless-stopped
+    volumes:
+      - ./ai-service:/app
+    ports:
+      - "5000:5000"
+    environment:
+      - OPENSEARCH_HOST=opensearch-node1
+      - OPENSEARCH_PORT=9200
+      - MEDIAWIKI_URL=http://mediawiki/api.php
+      - REDMINE_URL=http://redmine:3000
+      - REDMINE_API_KEY='c177337d75a1da3bb43d67ec9b9bb139b299502f'
+    networks:
+      - support_net
+
+networks:
+  support_net:
+    driver: bridge
+
+volumes:
+  mediawiki_data:
+  db_data:
+  opensearch_data1:
+  opensearch_data2:
+  redmine_data:
+  redmine_plugins:
+  redmine_db_data:

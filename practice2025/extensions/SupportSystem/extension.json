@@ -1,0 +1,145 @@
+{
+    "name": "SupportSystem",
+    "version": "1.0.0",
+    "author": [
+        "Dmitry Marov"
+    ],
+    "url": "https://www.mediawiki.org/wiki/Extension:SupportSystem",
+    "descriptionmsg": "supportsystem-desc",
+    "license-name": "GPL-2.0-or-later",
+    "type": "specialpage",
+    "requires": {
+        "MediaWiki": ">= 1.39.0"
+    },
+    "AutoloadNamespaces": {
+        "MediaWiki\\Extension\\SupportSystem\\": "includes/",
+        "MediaWiki\\SpecialPage\\": "specials/"
+    },
+    "SpecialPages": 
+    {
+        "DecisionTree": {
+            "class": "MediaWiki\\Extension\\SupportSystem\\Special\\SpecialDecisionTree"
+        },
+        "SearchSolutions": {
+            "class": "MediaWiki\\Extension\\SupportSystem\\Special\\SpecialSearchSolutions"
+        },
+        "ServiceDesk": {
+            "class": "MediaWiki\\Extension\\SupportSystem\\Special\\SpecialServiceDesk"
+        }
+    },
+    "APIModules": {
+        "supportnode": {
+            "class": "MediaWiki\\Extension\\SupportSystem\\API\\ApiSupportNode"
+        },
+        "supportsearch": {
+            "class":"MediaWiki\\Extension\\SupportSystem\\API\\ApiSupportSearch"
+        },
+        "supportticket": {
+            "class":"MediaWiki\\Extension\\SupportSystem\\API\\ApiSupportTicket"
+        }
+    },
+    "Hooks": {
+        "BeforePageDisplay": "MediaWiki\\Extension\\SupportSystem\\Hooks::onBeforePageDisplay"
+    },
+    "ResourceModules": {
+        "ext.supportSystem.styles": {
+            "styles": [
+                "modules/css/supportSystem.css"
+            ]
+        },
+        "ext.supportSystem.decisionTree": {
+            "scripts": [
+                "modules/js/decisionTree.js"
+            ],
+            "styles": [
+                "modules/css/decisionTree.css"
+            ],
+            "dependencies": [
+                "mediawiki.api",
+                "mediawiki.util"
+            ],
+            "messages": [
+                "supportsystem-dt-start",
+                "supportsystem-dt-restart",
+                "supportsystem-dt-next",
+                "supportsystem-dt-back",
+                "supportsystem-dt-solution"
+            ]
+        },
+        "ext.supportSystem.search": {
+            "scripts": [
+                "modules/js/search.js"
+            ],
+            "styles": [
+                "modules/css/search.css"
+            ],
+            "dependencies": [
+                "mediawiki.api",
+                "mediawiki.util"
+            ],
+            "messages": [
+                "supportsystem-search-title",
+                "supportsystem-search-button",
+                "supportsystem-search-placeholder",
+                "supportsystem-search-noresults"
+            ]
+        },
+        "ext.supportSystem.serviceDesk": {
+            "scripts": [
+                "modules/js/serviceDesk.js"
+            ],
+            "styles": [
+                "modules/css/serviceDesk.css"
+            ],
+            "dependencies": [
+                "mediawiki.api",
+                "mediawiki.util"
+            ],
+            "messages": [
+                "supportsystem-sd-title",
+                "supportsystem-sd-new",
+                "supportsystem-sd-list",
+                "supportsystem-sd-submit"
+            ]
+        }
+    },
+    "ResourceFileModulePaths": {
+        "localBasePath": "",
+        "remoteExtPath": "SupportSystem"
+    },
+    "MessagesDirs": {
+        "SupportSystem": [
+            "i18n/"
+        ]
+    },
+    "ExtensionMessagesFiles": {
+        "SupportSystemAlias": "SupportSystem.alias.php"
+    },
+    "config": {
+        "SupportSystemOpenSearchHost": {
+            "value": "opensearch-node1"
+        },
+        "SupportSystemOpenSearchPort": {
+            "value": 9200
+        },
+        "SupportSystemOpenSearchIndex": {
+            "value": "solutions"
+        },
+        "SupportSystemRedmineURL": {
+            "value": "http://redmine:3000"
+        },
+        "SupportSystemRedmineAPIKey": {
+            "value": "api-kek-lulz"
+        },
+        "SupportSystemAIServiceURL": {
+            "value": "http://ai-service:5000"
+        },
+        "SupportSystemUseMock": {
+            "value": false
+        },
+        "SupportSystemGraphDataFile": {
+            "value": "/var/www/html/extensions/SupportSystem/data/graph_data.json"
+        }
+    },
+    "manifest_version": 2
+}
