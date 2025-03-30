@@ -19,14 +19,8 @@ class SearchModule {
     /** @var string The OpenSearch index name */
     private $indexName;
     
-    /** @var bool Whether to use mock data */
-    private $useMock;
-    
     /** @var string The AI service URL */
     private $aiServiceUrl;
-    
-    /** @var array Mock data for testing */
-    private $mockData;
     
     /**
      * Constructor
@@ -39,54 +33,7 @@ class SearchModule {
         $this->indexName = $config->get( 'SupportSystemOpenSearchIndex' );
         $this->useMock = $config->get( 'SupportSystemUseMock' );
         $this->aiServiceUrl = $config->get( 'SupportSystemAIServiceURL' );
-        
-        if ( $this->useMock ) {
-            $this->loadMockData();
-        }
     }
-	
-	/**
-	 * Load mock data for testing
-	 */
-	private function loadMockData(): void {
-		$this->mockData = [
-			[
-				'id' => 'sol1',
-				'title' => 'Решение проблем с Wi-Fi подключением',
-				'content' => '1. Перезагрузите роутер. 2. Проверьте настройки Wi-Fi на устройстве. 3. Убедитесь, что пароль вводится правильно.',
-				'tags' => ['wi-fi', 'интернет', 'сеть', 'подключение'],
-				'source' => 'mock'
-			],
-			[
-				'id' => 'sol2',
-				'title' => 'Исправление проблем с электронной почтой',
-				'content' => '1. Проверьте подключение к интернету. 2. Убедитесь, что логин и пароль верны. 3. Очистите кэш приложения.',
-				'tags' => ['email', 'почта', 'авторизация'],
-				'source' => 'mock'
-			],
-			[
-				'id' => 'sol3',
-				'title' => 'Устранение неполадок с браузером',
-				'content' => '1. Очистите историю и кэш браузера. 2. Обновите браузер до последней версии. 3. Проверьте настройки интернет-соединения.',
-				'tags' => ['браузер', 'интернет', 'зависание'],
-				'source' => 'mock'
-			],
-			[
-				'id' => 'sol4',
-				'title' => 'Решение проблем с операционной системой',
-				'content' => '1. Перезагрузите компьютер. 2. Проверьте наличие обновлений. 3. Запустите диагностику системы.',
-				'tags' => ['ОС', 'система', 'компьютер', 'обновление'],
-				'source' => 'mock'
-			],
-			[
-				'id' => 'sol5',
-				'title' => 'Устранение проблем с мобильным приложением',
-				'content' => '1. Переустановите приложение. 2. Очистите кэш и данные приложения. 3. Обновите приложение до последней версии.',
-				'tags' => ['приложение', 'смартфон', 'мобильный', 'ошибка'],
-				'source' => 'mock'
-			]
-		];
-	}
 	
 	/**
 	 * Search for solutions in OpenSearch
@@ -96,57 +43,7 @@ class SearchModule {
 	 * @throws MWException
 	 */
 	public function search( string $query, int $size = 10 ): array {
-		if ( $this->useMock ) {
-			return $this->searchMock( $query );
-		}
-		
 		return $this->searchOpenSearch( $query, $size );
-	}
-	
-	/**
-	 * Search in mock data
-	 * @param string $query The search query
-	 * @return array
-	 */
-	private function searchMock( string $query ): array {
-		$results = [];
-		$queryLower = strtolower( $query );
-		
-		foreach ( $this->mockData as $doc ) {
-			$score = 0;
-			
-			// Check for keywords in title
-			if ( strpos( strtolower( $doc['title'] ), $queryLower ) !== false ) {
-				$score += 2;
-			}
-			
-			// Check for keywords in content
-			if ( strpos( strtolower( $doc['content'] ), $queryLower ) !== false ) {
-				$score += 1;
-			}
-			
-			// Check for keywords in tags
-			if ( isset( $doc['tags'] ) ) {
-				foreach ( $doc['tags'] as $tag ) {
-					if ( strpos( strtolower( $tag ), $queryLower ) !== false ) {
-						$score += 1;
-						break;
-					}
-				}
-			}
-			
-			if ( $score > 0 ) {
-				$doc['score'] = $score;
-				$results[] = $doc;
-			}
-		}
-		
-		// Sort by score
-		usort( $results, function ( $a, $b ) {
-			return $b['score'] <=> $a['score'];
-		} );
-		
-		return $results;
 	}
 	
 	/**
@@ -262,10 +159,6 @@ class SearchModule {
      */
     public function indexMediaWikiPage(int $pageId): bool
     {
-        if ($this->useMock) {
-            return true; // Do nothing in mock mode
-        }
-
         $title = \Title::newFromID($pageId);
         if (!$title || !$title->exists()) {
             return false;
@@ -347,23 +240,13 @@ class SearchModule {
 				]
 			];
 
-			\Wikimedia\Logger\LoggerFactory::getInstance('SupportSystem')->info(
-				'Making AI search request',
-				[
-					'query' => $query,
-					'userId' => $userId
-				]
-			);
+			// Добавим логирование для отладки
+			wfDebugLog('SupportSystem', 'Making AI search request to URL: ' . $url . ', data: ' . json_encode($requestData));
 
 			$response = Http::request($url, $options);
 
 			if ($response === false) {
-				\Wikimedia\Logger\LoggerFactory::getInstance('SupportSystem')->error(
-					'AI service unavailable',
-					[
-						'query' => $query
-					]
-				);
+				wfDebugLog('SupportSystem', 'AI service unavailable. URL: ' . $url);
 
 				// Return fallback answer if AI service is unavailable
 				return [
@@ -375,15 +258,12 @@ class SearchModule {
 
 			$data = json_decode($response, true);
 
+			// Добавим логирование ответа
+			wfDebugLog('SupportSystem', 'AI service response: ' . substr($response, 0, 500) . '...');
+
 			// Improved error handling and logging
 			if (!$data || !isset($data['answer'])) {
-				\Wikimedia\Logger\LoggerFactory::getInstance('SupportSystem')->error(
-					'Invalid AI service response',
-					[
-						'response' => $response,
-						'query' => $query
-					]
-				);
+				wfDebugLog('SupportSystem', 'Invalid AI service response: ' . $response);
 
 				return [
 					'answer' => 'Не удалось обработать ответ от сервиса ИИ. Пожалуйста, попробуйте снова позже.',
@@ -392,23 +272,9 @@ class SearchModule {
 				];
 			}
 
-			\Wikimedia\Logger\LoggerFactory::getInstance('SupportSystem')->info(
-				'AI search successful',
-				[
-					'query' => $query,
-					'hasResults' => isset($data['sources']) && count($data['sources']) > 0
-				]
-			);
-
 			return $data;
 		} catch (\Exception $e) {
-			\Wikimedia\Logger\LoggerFactory::getInstance('SupportSystem')->error(
-				'Error in searchAI',
-				[
-					'exception' => $e->getMessage(),
-					'query' => $query
-				]
-			);
+			wfDebugLog('SupportSystem', 'Error in searchAI: ' . $e->getMessage());
 
 			return [
 				'answer' => 'Произошла ошибка при выполнении интеллектуального поиска. Пожалуйста, попробуйте снова позже.',

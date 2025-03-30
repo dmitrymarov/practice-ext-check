@@ -18,17 +18,8 @@ class ServiceDesk
     /** @var string The Redmine API key */
     private $apiKey;
 
-    /** @var bool Whether to use mock data */
-    private $useMock;
-
-    /** @var array Mock tickets data */
-    private $mockTickets;
-
     /** @var int Next ticket ID for mock data */
     private $nextTicketId;
-
-    /** @var string The path to the mock data file */
-    private $mockDataFile;
 
     /**
      * Constructor
@@ -40,45 +31,7 @@ class ServiceDesk
         $this->apiUrl = $config->get('SupportSystemRedmineURL');
         $this->apiKey = $config->get('SupportSystemRedmineAPIKey');
         $this->useMock = $config->get('SupportSystemUseMock');
-
-        if ($this->useMock) {
-            $this->mockDataFile = __DIR__ . '/../data/mock_tickets.json';
-            $this->loadMockData();
-        }
     }
-
-    /**
-     * Load mock data from file
-     */
-    private function loadMockData(): void
-    {
-        if (file_exists($this->mockDataFile)) {
-            $content = file_get_contents($this->mockDataFile);
-            $data = FormatJson::decode($content, true);
-
-            $this->mockTickets = $data['tickets'] ?? [];
-            $this->nextTicketId = $data['nextId'] ?? 1;
-        } else {
-            $this->mockTickets = [];
-            $this->nextTicketId = 1;
-            $this->saveMockData();
-        }
-    }
-
-    /**
-     * Save mock data to file
-     */
-    private function saveMockData(): void
-    {
-        $data = [
-            'tickets' => $this->mockTickets,
-            'nextId' => $this->nextTicketId
-        ];
-
-        $content = FormatJson::encode($data, true);
-        file_put_contents($this->mockDataFile, $content);
-    }
-
     /**
      * Create a ticket in Redmine
      * @param string $subject Ticket subject
@@ -91,13 +44,8 @@ class ServiceDesk
      */
     public function createTicket(string $subject, string $description, string $priority = 'normal', int $assignedTo = null, int $projectId = 1): array
     {
-        // Log the ticket creation attempt
-        wfDebugLog('SupportSystem', "Creating ticket: $subject, Priority: $priority");
-
-        if ($this->useMock) {
-            wfDebugLog('SupportSystem', "Using mock data for ticket creation");
-            return $this->createMockTicket($subject, $description, $priority, $assignedTo, $projectId);
-        }
+        // Более подробное логирование
+        wfDebugLog('SupportSystem', "Creating ticket in Redmine: Subject=$subject, Priority=$priority, ProjectID=$projectId");
 
         $priorityId = $this->getPriorityId($priority);
 
@@ -106,7 +54,8 @@ class ServiceDesk
                 'subject' => $subject,
                 'description' => $description,
                 'project_id' => $projectId,
-                'priority_id' => $priorityId
+                'priority_id' => $priorityId,
+                'project_name' => 'support-system' // Добавляем название проекта
             ]
         ];
 
@@ -139,7 +88,10 @@ class ServiceDesk
         }
 
         // Log the response
-        wfDebugLog('SupportSystem', "Redmine response: $response");
+        wfDebugLog('SupportSystem', "Redmine API response status: " . (($response !== false) ? 'Success' : 'Failure'));
+        if ($response !== false) {
+            wfDebugLog('SupportSystem', "Redmine response: " . substr($response, 0, 500) . '...');
+        }
 
         $data = json_decode($response, true);
 
@@ -153,57 +105,13 @@ class ServiceDesk
     }
 
     /**
-     * Create a mock ticket
-     * @param string $subject Ticket subject
-     * @param string $description Ticket description
-     * @param string $priority Ticket priority
-     * @param int|null $assignedTo User ID to assign the ticket to
-     * @param int $projectId Project ID
-     * @return array The created ticket
-     */
-    private function createMockTicket(string $subject, string $description, string $priority = 'normal', int $assignedTo = null, int $projectId = 1): array
-    {
-        $ticket = [
-            'id' => $this->nextTicketId,
-            'subject' => $subject,
-            'description' => $description,
-            'priority' => $priority,
-            'status' => 'new',
-            'created_on' => wfTimestamp(TS_ISO_8601),
-            'project_id' => $projectId,
-            'comments' => []
-        ];
-
-        if ($assignedTo) {
-            $ticket['assigned_to'] = $assignedTo;
-        }
-
-        $this->mockTickets[] = $ticket;
-        $this->nextTicketId++;
-        $this->saveMockData();
-
-        return $ticket;
-    }
-
-    /**
      * Get a ticket by ID
      * @param int $ticketId Ticket ID
      * @return array|null The ticket or null if not found
      */
     public function getTicket(int $ticketId): ?array
     {
-        if ($this->useMock) {
-            foreach ($this->mockTickets as $ticket) {
-                if ($ticket['id'] === $ticketId) {
-                    return $ticket;
-                }
-            }
-
-            return null;
-        }
-
         $url = rtrim($this->apiUrl, '/') . "/issues/{$ticketId}.json";
-
         $options = [
             'method' => 'GET',
             'timeout' => 30,
@@ -211,21 +119,16 @@ class ServiceDesk
                 'X-Redmine-API-Key' => $this->apiKey
             ]
         ];
-
         $response = Http::request($url, $options);
-
         if ($response === false) {
             wfDebugLog('SupportSystem', "Error retrieving ticket #$ticketId: No response");
             return null;
         }
-
         $data = json_decode($response, true);
-
         if (!isset($data['issue'])) {
             wfDebugLog('SupportSystem', "Error retrieving ticket #$ticketId: " . substr($response, 0, 100));
             return null;
         }
-
         return $data['issue'];
     }
 
@@ -235,12 +138,7 @@ class ServiceDesk
      */
     public function getAllTickets(): array
     {
-        if ($this->useMock) {
-            return $this->mockTickets;
-        }
-
         $url = rtrim($this->apiUrl, '/') . "/issues.json";
-
         $options = [
             'method' => 'GET',
             'timeout' => 30,
@@ -248,21 +146,16 @@ class ServiceDesk
                 'X-Redmine-API-Key' => $this->apiKey
             ]
         ];
-
         $response = Http::request($url, $options);
-
         if ($response === false) {
             wfDebugLog('SupportSystem', "Error retrieving all tickets: No response");
             return [];
         }
-
         $data = json_decode($response, true);
-
         if (!isset($data['issues'])) {
             wfDebugLog('SupportSystem', "Error retrieving all tickets: " . substr($response, 0, 100));
             return [];
         }
-
         return $data['issues'];
     }
 
@@ -274,32 +167,11 @@ class ServiceDesk
      */
     public function addComment(int $ticketId, string $comment): bool
     {
-        if ($this->useMock) {
-            foreach ($this->mockTickets as $key => $ticket) {
-                if ($ticket['id'] === $ticketId) {
-                    if (!isset($this->mockTickets[$key]['comments'])) {
-                        $this->mockTickets[$key]['comments'] = [];
-                    }
-
-                    $this->mockTickets[$key]['comments'][] = [
-                        'text' => $comment,
-                        'created_on' => wfTimestamp(TS_ISO_8601)
-                    ];
-
-                    $this->saveMockData();
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
         $issueData = [
             'issue' => [
                 'notes' => $comment
             ]
         ];
-
         $url = rtrim($this->apiUrl, '/') . "/issues/{$ticketId}.json";
 
         $options = [
@@ -311,14 +183,11 @@ class ServiceDesk
                 'X-Redmine-API-Key' => $this->apiKey
             ]
         ];
-
         $response = Http::request($url, $options);
-
         if ($response === false) {
             wfDebugLog('SupportSystem', "Error adding comment to ticket #$ticketId: No response");
             return false;
         }
-
         // For Redmine, a successful update returns 204 No Content
         return true;
     }

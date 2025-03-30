@@ -13,10 +13,13 @@ class ApiSupportTicket extends ApiBase
     /**
      * Execute the API module
      */
+    /**
+     * Execute the API module
+     */
     public function execute()
     {
         $params = $this->extractRequestParams();
-        $ticketOperation = $params['operation']; // Используем другое имя параметра
+        $ticketOperation = $params['operation']; // Используем параметр operation для совместимости
 
         $serviceDesk = new ServiceDesk();
 
@@ -36,7 +39,8 @@ class ApiSupportTicket extends ApiBase
                         $subject,
                         $description,
                         $priority,
-                        $assignedTo
+                        $assignedTo,
+                        1  // Project ID for 'support-system'
                     );
 
                     wfDebugLog('SupportSystem', "API: Ticket created successfully");

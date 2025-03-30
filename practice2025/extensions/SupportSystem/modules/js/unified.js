@@ -212,22 +212,106 @@
         container.show();
     }
 
-    /**
-     * Показать решение
-     * @param {string} text Текст решения
-     */
+    var searchState = {
+        graphSearchDone: false,
+        wikiSearchDone: false,
+        aiSearchDone: false,
+        searchQuery: ''
+    };
+
+    // Функция для инициации процесса поиска решения
+    function startSolutionSearch() {
+        // Сначала сбрасываем состояние
+        searchState = {
+            graphSearchDone: false,
+            wikiSearchDone: false,
+            aiSearchDone: false,
+            searchQuery: ''
+        };
+
+        // Начинаем с графа
+        $('#support-chat-container').empty();
+        $('.support-welcome-message').remove();
+        loadNode('root');
+    }
+
+    // Модифицируем showSolution, чтобы предлагать альтернативные варианты поиска
     function showSolution(text) {
         $('#support-solution-text').text(text);
         $('#support-options-container').hide();
+
+        // Добавляем опцию поиска в MediaWiki, если решение не подходит
+        $('#support-wiki-search-button').show();
+        $('#support-ai-search-button').show();
+
         $('#support-solution-container').show();
+
+        // Запоминаем найденное решение
+        currentSolution = text;
+        searchState.graphSearchDone = true;
     }
 
-    /**
-     * Поиск через AI
-     * @param {string} query Поисковый запрос
-     */
+    // Функция для поиска по MediaWiki, если решение через граф не подошло
+    function searchWiki(query) {
+        searchState.searchQuery = query || currentSolution;
+
+        // Показываем индикатор загрузки
+        $('#support-search-results').html(
+            '<div class="support-loading">' +
+            '<div class="support-spinner"></div>' +
+            '<p>' + (messages.search_loading || 'Searching...') + '</p>' +
+            '</div>'
+        );
+
+        // Выполняем поиск через MediaWiki
+        var api = new mw.Api();
+        api.get({
+            action: 'supportsearch',
+            query: searchState.searchQuery,
+            sources: 'opensearch|mediawiki',
+            use_ai: 0
+        }).done(function (data) {
+            searchState.wikiSearchDone = true;
+
+            if (data.results && data.results.length > 0) {
+                displaySearchResults(data.results, searchState.searchQuery);
+            } else {
+                // Если результатов нет, предлагаем поиск через AI
+                $('#support-search-results').html(
+                    '<div class="support-no-results">' +
+                    '<p>' + (messages.search_noresults || 'No results found.') + '</p>' +
+                    '<button id="support-ai-search-button" class="support-button-primary">' +
+                    (mw.msg('supportsystem-dt-ai-search') || 'Try AI Search') + '</button>' +
+                    '</div>'
+                );
+
+                // Добавляем обработчик для кнопки AI поиска
+                $('#support-ai-search-button').on('click', function () {
+                    searchAI(searchState.searchQuery);
+                });
+            }
+        }).fail(function (error) {
+            // В случае ошибки также предлагаем поиск через AI
+            $('#support-search-results').html(
+                '<div class="support-error">' +
+                '<p>' + (messages.search_error || 'An error occurred during the search.') + '</p>' +
+                '<button id="support-ai-search-button" class="support-button-primary">' +
+                (mw.msg('supportsystem-dt-ai-search') || 'Try AI Search') + '</button>' +
+                '</div>'
+            );
+
+            // Добавляем обработчик для кнопки AI поиска
+            $('#support-ai-search-button').on('click', function () {
+                searchAI(searchState.searchQuery);
+            });
+
+            console.error('Search error:', error);
+        });
+    }
+    
     function searchAI(query) {
         var api = new mw.Api();
+        searchState.searchQuery = query || searchState.searchQuery || currentSolution;
 
         // Подготовить контекст из истории диалога
         var context = [];
@@ -237,8 +321,6 @@
                 answer: item.selectedOption
             });
         });
-
-        // Показать индикатор загрузки
         $('#support-ai-loading').show();
         $('#support-ai-content').hide();
         $('#support-ai-container').show();
@@ -246,10 +328,12 @@
 
         api.get({
             action: 'supportsearch',
-            query: query,
+            query: searchState.searchQuery,
             use_ai: 1,
             context: JSON.stringify(context)
         }).done(function (data) {
+            searchState.aiSearchDone = true;
+
             if (data.ai_result && data.ai_result.success) {
                 // Показать ответ AI
                 $('#support-ai-text').text(data.ai_result.answer);
@@ -281,19 +365,27 @@
                 } else {
                     $('#support-ai-sources').hide();
                 }
+
+                // Всегда показываем кнопку создания заявки как последний шаг
+                $('#support-ai-ticket-button').show();
             } else {
-                // Показать сообщение об ошибке
+                // Показать сообщение об ошибке и кнопку создания заявки
                 $('#support-ai-text').text(data.ai_result && data.ai_result.answer ||
                     messages.ai_error || 'An error occurred while processing the AI request.');
                 $('#support-ai-loading').hide();
                 $('#support-ai-content').show();
                 $('#support-ai-sources').hide();
+                $('#support-ai-ticket-button').show();
             }
         }).fail(function (error) {
+            searchState.aiSearchDone = true;
+
             $('#support-ai-text').text(messages.ai_error || 'An error occurred while processing the AI request.');
             $('#support-ai-loading').hide();
             $('#support-ai-content').show();
             $('#support-ai-sources').hide();
+            $('#support-ai-ticket-button').show();
+
             console.error('Error in AI search:', error);
         });
     }
@@ -765,14 +857,39 @@
     }
 
     /**
-     * Показать форму создания заявки
-     * @param {string} solution Текст решения (если есть)
-     * @param {string} source Источник решения
-     */
+ * Показать форму создания заявки
+ * @param {string} solution Текст решения (если есть)
+ * @param {string} source Источник решения
+ */
     function showTicketForm(solution, source) {
         selectedSolution = solution || '';
         selectedSource = source || '';
 
+        // Убедимся, что все тексты полей корректно загружаются
+        var ticketSubjectLabel = mw.msg('supportsystem-dt-ticket-subject') || 'Ticket Subject';
+        var ticketDescriptionLabel = mw.msg('supportsystem-dt-ticket-description') || 'Problem Description';
+        var ticketPriorityLabel = mw.msg('supportsystem-dt-ticket-priority') || 'Priority';
+        var lowPriorityLabel = mw.msg('supportsystem-dt-priority-low') || 'Low';
+        var normalPriorityLabel = mw.msg('supportsystem-dt-priority-normal') || 'Normal';
+        var highPriorityLabel = mw.msg('supportsystem-dt-priority-high') || 'High';
+        var urgentPriorityLabel = mw.msg('supportsystem-dt-priority-urgent') || 'Urgent';
+        var cancelButtonLabel = mw.msg('supportsystem-dt-cancel') || 'Cancel';
+        var submitButtonLabel = mw.msg('supportsystem-dt-submit') || 'Submit';
+
+        // Обновим текст элементов формы
+        $('#support-ticket-subject-label').text(ticketSubjectLabel);
+        $('#support-ticket-description-label').text(ticketDescriptionLabel);
+        $('#support-ticket-priority-label').text(ticketPriorityLabel);
+        $('#support-ticket-cancel').text(cancelButtonLabel);
+        $('#support-ticket-submit').text(submitButtonLabel);
+
+        // Обновим варианты приоритета
+        $('#support-ticket-priority option[value="low"]').text(lowPriorityLabel);
+        $('#support-ticket-priority option[value="normal"]').text(normalPriorityLabel);
+        $('#support-ticket-priority option[value="high"]').text(highPriorityLabel);
+        $('#support-ticket-priority option[value="urgent"]').text(urgentPriorityLabel);
+
+        // Установим значения для полей формы
         $('#support-ticket-subject').val(mw.msg('supportsystem-search-default-subject') || 'Help Request');
 
         if (solution) {
@@ -806,10 +923,6 @@
 
         $('#support-ticket-form').show();
     }
-
-    /**
-     * Отправить заявку
-     */
     function submitTicket() {
         var api = new mw.Api();
 
@@ -832,6 +945,13 @@
         $('#support-ticket-submit').prop('disabled', true);
         $('#support-ticket-submit').text(mw.msg('supportsystem-dt-submitting') || 'Submitting...');
 
+        // Логируем запрос для отладки
+        console.log('Submitting ticket:', {
+            subject: subject,
+            description: description,
+            priority: priority
+        });
+
         api.post({
             action: 'supportticket',
             operation: 'create',
@@ -839,6 +959,8 @@
             description: description,
             priority: priority
         }).done(function (data) {
+            console.log('Ticket creation response:', data);
+
             if (data.ticket) {
                 // Если есть решение, прикрепить его к заявке
                 if (selectedSolution) {
@@ -852,17 +974,13 @@
                 $('#support-ticket-submit').text(mw.msg('supportsystem-dt-submit') || 'Submit');
             }
         }).fail(function (error) {
-            mw.notify(mw.msg('supportsystem-search-ticket-error') || 'Error creating ticket', { type: 'error' });
             console.error('Error creating ticket:', error);
+            mw.notify(mw.msg('supportsystem-search-ticket-error') || 'Error creating ticket', { type: 'error' });
             $('#support-ticket-submit').prop('disabled', false);
             $('#support-ticket-submit').text(mw.msg('supportsystem-dt-submit') || 'Submit');
         });
     }
 
-    /**
-     * Прикрепить решение к заявке
-     * @param {number} ticketId ID заявки
-     */
     function attachSolution(ticketId) {
         var api = new mw.Api();
 
@@ -875,9 +993,36 @@
         }).done(function () {
             showTicketSuccess(ticketId);
         }).fail(function (error) {
-            // Даже если не удалось прикрепить решение, заявка была создана
             showTicketSuccess(ticketId);
             console.error('Error attaching solution:', error);
+        });
+    }
+
+    function addComment(ticketId, comment) {
+        var api = new mw.Api();
+
+        $('#support-comment-submit').prop('disabled', true);
+
+        api.post({
+            action: 'supportticket',
+            operation: 'comment', // Изменено с 'action' на 'operation'
+            ticket_id: ticketId,
+            comment: comment
+        }).done(function (data) {
+            if (data.result === 'success') {
+                mw.notify(mw.msg('supportsystem-sd-ticket-comment-success') || 'Comment added successfully', { type: 'success' });
+                $('#support-comment-text').val('');
+
+                // Обновить данные заявки
+                viewTicket(ticketId);
+            } else {
+                mw.notify(mw.msg('supportsystem-sd-ticket-comment-error') || 'Error adding comment', { type: 'error' });
+            }
+        }).fail(function (error) {
+            mw.notify(mw.msg('supportsystem-sd-ticket-comment-error') || 'Error adding comment', { type: 'error' });
+            console.error('Error adding comment:', error);
+        }).always(function () {
+            $('#support-comment-submit').prop('disabled', false);
         });
     }
 

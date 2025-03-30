@@ -332,6 +332,54 @@ HTML;
         return $html;
     }
 
+    private function createTicketForm(): string
+    {
+        $html = <<<HTML
+<div id="support-ticket-form" class="support-form-overlay" style="display: none;">
+    <div class="support-form-container">
+        <div class="support-form-header">
+            <h3>{$this->msg('supportsystem-dt-ticket-header')->escaped()}</h3>
+            <button id="support-ticket-close" class="support-close-button">&times;</button>
+        </div>
+        <div id="support-solution-display" class="support-solution-display" style="display: none;">
+            <h4>{$this->msg('supportsystem-dt-solution-header')->escaped()}</h4>
+            <p id="support-solution-text"></p>
+            <p id="support-solution-source" class="support-source"></p>
+        </div>
+        <form id="support-ticket-form-element">
+            <div class="support-form-group">
+                <label id="support-ticket-subject-label" for="support-ticket-subject">{$this->msg('supportsystem-dt-ticket-subject')->escaped()}</label>
+                <input type="text" id="support-ticket-subject" class="support-input" required>
+            </div>
+            <div class="support-form-group">
+                <label id="support-ticket-description-label" for="support-ticket-description">{$this->msg('supportsystem-dt-ticket-description')->escaped()}</label>
+                <textarea id="support-ticket-description" class="support-textarea" rows="5" required></textarea>
+            </div>
+            <div class="support-form-group">
+                <label id="support-ticket-priority-label" for="support-ticket-priority">{$this->msg('supportsystem-dt-ticket-priority')->escaped()}</label>
+                <select id="support-ticket-priority" class="support-select">
+                    <option value="low">{$this->msg('supportsystem-dt-priority-low')->escaped()}</option>
+                    <option value="normal" selected>{$this->msg('supportsystem-dt-priority-normal')->escaped()}</option>
+                    <option value="high">{$this->msg('supportsystem-dt-priority-high')->escaped()}</option>
+                    <option value="urgent">{$this->msg('supportsystem-dt-priority-urgent')->escaped()}</option>
+                </select>
+            </div>
+            <div class="support-form-actions">
+                <button type="button" id="support-ticket-cancel" class="support-button-secondary">
+                    {$this->msg('supportsystem-dt-cancel')->escaped()}
+                </button>
+                <button type="submit" id="support-ticket-submit" class="support-button-primary">
+                    {$this->msg('supportsystem-dt-submit')->escaped()}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+HTML;
+
+        return $html;
+    }
+
     /**
      * Get the group name for categorization in Special:SpecialPages
      * @return string

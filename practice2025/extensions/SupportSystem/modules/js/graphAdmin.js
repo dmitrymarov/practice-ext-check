@@ -424,9 +424,6 @@
         updateEdgesList();
     }
 
-    /**
-     * Save the entire graph
-     */
     function saveGraph() {
         var api = new mw.Api();
 
@@ -435,7 +432,7 @@
 
         api.postWithToken('csrf', {
             action: 'supportgraphadmin',
-            graphaction: 'save', // Изменяем имя параметра
+            graphaction: 'save', // Используем правильное имя параметра
             nodes: JSON.stringify(nodes),
             edges: JSON.stringify(edges)
         }).done(function (data) {
@@ -457,7 +454,6 @@
             $('#support-graph-save').prop('disabled', false);
         });
     }
-
     /**
      * Render the graph visualization
      */

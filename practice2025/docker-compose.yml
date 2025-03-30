@@ -149,14 +149,14 @@ services:
     restart: unless-stopped
     volumes:
       - ./ai-service:/app
+      - ai_service_data:/app/data
     ports:
       - "5000:5000"
     environment:
-      - OPENSEARCH_HOST=opensearch-node1
-      - OPENSEARCH_PORT=9200
       - MEDIAWIKI_URL=http://mediawiki/api.php
       - REDMINE_URL=http://redmine:3000
-      - REDMINE_API_KEY='c177337d75a1da3bb43d67ec9b9bb139b299502f'
+      - REDMINE_API_KEY=c177337d75a1da3bb43d67ec9b9bb139b299502f
+      - STORAGE_PATH=/app/data
     networks:
       - support_net
 
@@ -172,3 +172,4 @@ volumes:
   redmine_data:
   redmine_plugins:
   redmine_db_data:
+  ai_service_data:
