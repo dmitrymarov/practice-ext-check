@@ -43,11 +43,16 @@ class DecisionGraph
 
     /**
      * Save the graph to a file
+     * @return bool Success status
      */
-    public function saveGraph(): void
+    public function saveGraph(): bool
     {
-        $content = FormatJson::encode($this->graph, true);
-        file_put_contents($this->filePath, $content);
+        try {
+            $content = FormatJson::encode($this->graph, true);
+            return file_put_contents($this->filePath, $content) !== false;
+        } catch (\Exception $e) {
+            return false;
+        }
     }
 
     /**
@@ -120,6 +125,24 @@ class DecisionGraph
     }
 
     /**
+     * Get the entire graph data
+     * @return array The graph data
+     */
+    public function getGraph(): array
+    {
+        return $this->graph;
+    }
+
+    /**
+     * Set the entire graph data
+     * @param array $graphData The graph data
+     */
+    public function setGraph(array $graphData): void
+    {
+        $this->graph = $graphData;
+    }
+
+    /**
      * Get the root node of the graph
      * @return string|null
      */
@@ -173,5 +196,197 @@ class DecisionGraph
         }
 
         return $children;
+    }
+    
+    /**
+     * Add a new node to the graph
+     * @param array $node The node data
+     * @return bool Success status
+     */
+    public function addNode(array $node): bool
+    {
+        // Validate required fields
+        if (!isset($node['id']) || !isset($node['content']) || !isset($node['type'])) {
+            return false;
+        }
+        
+        // Check if node already exists
+        foreach ($this->graph['nodes'] as $existingNode) {
+            if ($existingNode['id'] === $node['id']) {
+                return false;
+            }
+        }
+        
+        $this->graph['nodes'][] = $node;
+        return true;
+    }
+    
+    /**
+     * Update an existing node
+     * @param string $nodeId The node ID
+     * @param array $nodeData The new node data
+     * @return bool Success status
+     */
+    public function updateNode(string $nodeId, array $nodeData): bool
+    {
+        foreach ($this->graph['nodes'] as $key => $node) {
+            if ($node['id'] === $nodeId) {
+                // If ID is being changed, update all edges as well
+                if (isset($nodeData['id']) && $nodeData['id'] !== $nodeId) {
+                    $newId = $nodeData['id'];
+                    
+                    // Update source references
+                    foreach ($this->graph['edges'] as $edgeKey => $edge) {
+                        if ($edge['source'] === $nodeId) {
+                            $this->graph['edges'][$edgeKey]['source'] = $newId;
+                        }
+                    }
+                    
+                    // Update target references
+                    foreach ($this->graph['edges'] as $edgeKey => $edge) {
+                        if ($edge['target'] === $nodeId) {
+                            $this->graph['edges'][$edgeKey]['target'] = $newId;
+                        }
+                    }
+                }
+                
+                // Update node data
+                $this->graph['nodes'][$key] = array_merge($node, $nodeData);
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Delete a node from the graph
+     * @param string $nodeId The node ID
+     * @return bool Success status
+     */
+    public function deleteNode(string $nodeId): bool
+    {
+        $found = false;
+        
+        // Remove node
+        foreach ($this->graph['nodes'] as $key => $node) {
+            if ($node['id'] === $nodeId) {
+                unset($this->graph['nodes'][$key]);
+                $this->graph['nodes'] = array_values($this->graph['nodes']); // Re-index array
+                $found = true;
+                break;
+            }
+        }
+        
+        if (!$found) {
+            return false;
+        }
+        
+        // Remove all edges connected to this node
+        foreach ($this->graph['edges'] as $key => $edge) {
+            if ($edge['source'] === $nodeId || $edge['target'] === $nodeId) {
+                unset($this->graph['edges'][$key]);
+            }
+        }
+        
+        $this->graph['edges'] = array_values($this->graph['edges']); // Re-index array
+        
+        return true;
+    }
+    
+    /**
+     * Add an edge to the graph
+     * @param array $edge The edge data
+     * @return bool Success status
+     */
+    public function addEdge(array $edge): bool
+    {
+        // Validate required fields
+        if (!isset($edge['source']) || !isset($edge['target'])) {
+            return false;
+        }
+        
+        // Check if source and target nodes exist
+        $sourceExists = false;
+        $targetExists = false;
+        
+        foreach ($this->graph['nodes'] as $node) {
+            if ($node['id'] === $edge['source']) {
+                $sourceExists = true;
+            }
+            if ($node['id'] === $edge['target']) {
+                $targetExists = true;
+            }
+        }
+        
+        if (!$sourceExists || !$targetExists) {
+            return false;
+        }
+        
+        // Check if edge already exists
+        foreach ($this->graph['edges'] as $existingEdge) {
+            if ($existingEdge['source'] === $edge['source'] && $existingEdge['target'] === $edge['target']) {
+                return false;
+            }
+        }
+        
+        $this->graph['edges'][] = $edge;
+        return true;
+    }
+    
+    /**
+     * Update an existing edge
+     * @param int $edgeIndex Index of the edge to update
+     * @param array $edgeData The new edge data
+     * @return bool Success status
+     */
+    public function updateEdge(int $edgeIndex, array $edgeData): bool
+    {
+        if (!isset($this->graph['edges'][$edgeIndex])) {
+            return false;
+        }
+        
+        // Validate required fields if changing source/target
+        if ((isset($edgeData['source']) || isset($edgeData['target']))) {
+            $sourceNode = isset($edgeData['source']) ? $edgeData['source'] : $this->graph['edges'][$edgeIndex]['source'];
+            $targetNode = isset($edgeData['target']) ? $edgeData['target'] : $this->graph['edges'][$edgeIndex]['target'];
+            
+            $sourceExists = false;
+            $targetExists = false;
+            
+            foreach ($this->graph['nodes'] as $node) {
+                if ($node['id'] === $sourceNode) {
+                    $sourceExists = true;
+                }
+                if ($node['id'] === $targetNode) {
+                    $targetExists = true;
+                }
+            }
+            
+            if (!$sourceExists || !$targetExists) {
+                return false;
+            }
+        }
+        
+        // Update edge data
+        $this->graph['edges'][$edgeIndex] = array_merge($this->graph['edges'][$edgeIndex], $edgeData);
+        return true;
+    }
+    
+    /**
+     * Delete an edge from the graph
+     * @param int $edgeIndex Index of the edge to delete
+     * @return bool Success status
+     */
+    public function deleteEdge(int $edgeIndex): bool
+    {
+        if (!isset($this->graph['edges'][$edgeIndex])) {
+            return false;
+        }
+        
+        unset($this->graph['edges'][$edgeIndex]);
+        $this->graph['edges'] = array_values($this->graph['edges']); // Re-index array
+        
+        return true;
     }
 }

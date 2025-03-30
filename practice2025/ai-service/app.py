@@ -1,20 +1,14 @@
-from flask import Flask, jsonify, request
-from flask_cors import CORS
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
+from typing import List, Dict, Any, Optional
 import os
-import requests
-import json
 import logging
-from opensearchpy import OpenSearch
-from sentence_transformers import SentenceTransformer
-from sklearn.metrics.pairwise import cosine_similarity
-import numpy as np
-import nltk
-from nltk.tokenize import word_tokenize
-from nltk.corpus import stopwords
-
-# Download NLTK resources
-nltk.download('punkt')
-nltk.download('stopwords')
+import time
+import uuid
+import json
+import requests
 
 # Configure logging
 logging.basicConfig(
@@ -23,378 +17,438 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
-CORS(app)
+# Initialize FastAPI app
+app = FastAPI(
+    title="Support System AI Service",
+    description="AI service for MediaWiki Support System extension",
+    version="1.0.0"
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Models for requests and responses
+class SearchQuery(BaseModel):
+    query: str
+    context: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
+    user_id: Optional[str] = None
+
+class Source(BaseModel):
+    title: str
+    id: str
+    score: float
+    url: Optional[str] = None
+
+class AISearchResponse(BaseModel):
+    answer: str
+    sources: List[Source] = Field(default_factory=list)
+    success: bool
 
 # Environment variables
-OPENSEARCH_HOST = os.environ.get('OPENSEARCH_HOST', 'localhost')
-OPENSEARCH_PORT = int(os.environ.get('OPENSEARCH_PORT', 9200))
-OPENSEARCH_INDEX = os.environ.get('OPENSEARCH_INDEX', 'solutions')
 MEDIAWIKI_URL = os.environ.get('MEDIAWIKI_URL', 'http://mediawiki/api.php')
 REDMINE_URL = os.environ.get('REDMINE_URL', 'http://redmine:3000')
-REDMINE_API_KEY = os.environ.get('REDMINE_API_KEY', 'c177337d75a1da3bb43d67ec9b9bb139b299502f')
+STORAGE_PATH = os.environ.get('STORAGE_PATH', '/app/data')
 
-# Initialize OpenSearch client
-try:
-    opensearch = OpenSearch(
-        hosts=[{'host': OPENSEARCH_HOST, 'port': OPENSEARCH_PORT}],
-        http_auth=None,
-        use_ssl=False,
-        verify_certs=False,
-        ssl_show_warn=False,
-        timeout=30,
-        retry_on_timeout=True,
-        max_retries=3
+# Ensure storage directory exists
+os.makedirs(STORAGE_PATH, exist_ok=True)
+
+# Middleware for request tracking
+@app.middleware("http")
+async def add_request_id(request: Request, call_next):
+    request_id = str(uuid.uuid4())
+    start_time = time.time()
+    
+    logger.info(f"Request {request_id} started: {request.method} {request.url.path}")
+    
+    response = await call_next(request)
+    
+    process_time = time.time() - start_time
+    logger.info(f"Request {request_id} completed in {process_time:.4f}s")
+    
+    return response
+
+# Global exception handler
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled exception: {str(exc)}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "An internal server error occurred"}
     )
-    logger.info(f"OpenSearch connection established: {OPENSEARCH_HOST}:{OPENSEARCH_PORT}")
-except Exception as e:
-    logger.error(f"Error connecting to OpenSearch: {str(e)}")
-    opensearch = None
 
-# Initialize sentence transformer model
-try:
-    model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
-    logger.info("Sentence transformer model loaded")
-except Exception as e:
-    logger.error(f"Error loading sentence transformer model: {str(e)}")
-    model = None
+# Health check endpoint
+@app.get("/", tags=["Health"])
+async def health_check():
+    return {"status": "ok", "message": "AI service is running"}
 
-@app.route('/')
-def index():
-    return jsonify({
-        'status': 'ok',
-        'message': 'AI service is running'
-    })
+# Query history manager
+class QueryHistoryManager:
+    def __init__(self):
+        self.history_file = os.path.join(STORAGE_PATH, "query_history.json")
+        self.frequent_queries_file = os.path.join(STORAGE_PATH, "frequent_queries.json")
+        self.load_history()
+        self.load_frequent_queries()
+    
+    def load_history(self):
+        try:
+            if os.path.exists(self.history_file):
+                with open(self.history_file, 'r', encoding='utf-8') as f:
+                    self.history = json.load(f)
+            else:
+                self.history = {}
+        except Exception as e:
+            logger.error(f"Error loading history: {str(e)}")
+            self.history = {}
+    
+    def save_history(self):
+        try:
+            with open(self.history_file, 'w', encoding='utf-8') as f:
+                json.dump(self.history, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            logger.error(f"Error saving history: {str(e)}")
+    
+    def load_frequent_queries(self):
+        try:
+            if os.path.exists(self.frequent_queries_file):
+                with open(self.frequent_queries_file, 'r', encoding='utf-8') as f:
+                    self.frequent_queries = json.load(f)
+            else:
+                self.frequent_queries = {}
+        except Exception as e:
+            logger.error(f"Error loading frequent queries: {str(e)}")
+            self.frequent_queries = {}
+    
+    def save_frequent_queries(self):
+        try:
+            with open(self.frequent_queries_file, 'w', encoding='utf-8') as f:
+                json.dump(self.frequent_queries, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            logger.error(f"Error saving frequent queries: {str(e)}")
+    
+    def get_user_history(self, user_id):
+        if not user_id:
+            return []
+        
+        return self.history.get(user_id, [])
+    
+    def update_user_history(self, user_id, query, response):
+        if not user_id:
+            return
+        
+        if user_id not in self.history:
+            self.history[user_id] = []
+        
+        # Add the query to history
+        history_entry = {
+            "query": query,
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "answer": response.get("answer", ""),
+            "sources": response.get("sources", [])
+        }
+        
+        # Keep only last 20 queries in history
+        self.history[user_id] = [history_entry] + self.history[user_id][:19]
+        
+        self.save_history()
+    
+    def update_frequent_queries(self, query, response):
+        # Normalize query
+        normalized_query = " ".join(query.lower().split())
+        
+        if normalized_query not in self.frequent_queries:
+            self.frequent_queries[normalized_query] = {
+                "count": 0,
+                "last_response": None,
+                "sources": []
+            }
+        
+        self.frequent_queries[normalized_query]["count"] += 1
+        self.frequent_queries[normalized_query]["last_response"] = response.get("answer", "")
+        
+        # Update sources if present
+        if "sources" in response and response["sources"]:
+            self.frequent_queries[normalized_query]["sources"] = response["sources"]
+        
+        self.save_frequent_queries()
+    
+    def find_similar_query(self, query):
+        normalized_query = " ".join(query.lower().split())
+        
+        # Exact match
+        if normalized_query in self.frequent_queries:
+            return self.frequent_queries[normalized_query]
+        
+        # Check for queries containing this one
+        for q, data in self.frequent_queries.items():
+            if normalized_query in q or q in normalized_query:
+                return data
+        
+        # Check for word-level matches
+        query_words = set(normalized_query.split())
+        best_match = None
+        best_match_score = 0
+        
+        for q, data in self.frequent_queries.items():
+            q_words = set(q.split())
+            common_words = query_words.intersection(q_words)
+            
+            if common_words:
+                score = len(common_words) / max(len(query_words), len(q_words))
+                if score > 0.6 and score > best_match_score:
+                    best_match = data
+                    best_match_score = score
+        
+        return best_match
 
-@app.route('/api/search_ai', methods=['POST'])
-def search_ai():
+# MediaWiki client
+class MediaWikiClient:
+    def __init__(self, api_url):
+        self.api_url = api_url
+    
+    def search_pages(self, query, limit=5):
+        """
+        Search for pages in MediaWiki
+        """
+        try:
+            params = {
+                'action': 'query',
+                'list': 'search',
+                'srsearch': query,
+                'srlimit': limit,
+                'format': 'json'
+            }
+            
+            response = requests.get(self.api_url, params=params, timeout=10)
+            
+            if response.status_code != 200:
+                logger.error(f"Error searching MediaWiki: {response.status_code} {response.text}")
+                return []
+            
+            data = response.json()
+            
+            if 'query' not in data or 'search' not in data['query']:
+                return []
+            
+            results = []
+            for page in data['query']['search']:
+                page_url = f"{self.api_url.split('/api.php')[0]}/index.php?title={page['title'].replace(' ', '_')}"
+                
+                results.append({
+                    'id': f"mediawiki_{page['pageid']}",
+                    'title': page['title'],
+                    'content': self.strip_html(page.get('snippet', '')),
+                    'url': page_url,
+                    'score': 1.0,
+                    'source': 'mediawiki'
+                })
+            
+            return results
+        
+        except Exception as e:
+            logger.error(f"Error searching MediaWiki: {str(e)}")
+            return []
+    
+    def get_page_content(self, page_id):
+        """
+        Get content of a page by ID
+        """
+        try:
+            if not page_id.startswith('mediawiki_'):
+                return None
+            
+            page_id = page_id.replace('mediawiki_', '')
+            
+            params = {
+                'action': 'parse',
+                'pageid': page_id,
+                'prop': 'text',
+                'format': 'json'
+            }
+            
+            response = requests.get(self.api_url, params=params, timeout=10)
+            
+            if response.status_code != 200:
+                logger.error(f"Error getting page content: {response.status_code} {response.text}")
+                return None
+            
+            data = response.json()
+            
+            if 'parse' not in data or 'text' not in data['parse']:
+                return None
+            
+            return self.strip_html(data['parse']['text']['*'])
+        
+        except Exception as e:
+            logger.error(f"Error getting page content: {str(e)}")
+            return None
+    
+    def strip_html(self, html):
+        """
+        Remove HTML tags from text
+        """
+        import re
+        return re.sub('<.*?>', ' ', html).strip()
+
+# Initialize components
+history_manager = QueryHistoryManager()
+mediawiki_client = MediaWikiClient(MEDIAWIKI_URL)
+
+# AI-powered search endpoint
+@app.post("/api/search_ai", response_model=AISearchResponse, tags=["Search"])
+async def search_ai(search_query: SearchQuery):
     """
-    Endpoint for AI-powered search
+    AI-powered search endpoint
     
-    Expects JSON with:
-    - query: Search query text
-    - context: Optional context from previous interactions
+    Analyze query context and find relevant information from MediaWiki
     
-    Returns:
-    - answer: Generated answer based on relevant documents
-    - sources: List of sources used for the answer
-    - success: Boolean indicating success
+    - **query**: Search query text
+    - **context**: Optional context from previous interactions
+    - **user_id**: Optional user identifier for personalization
     """
     try:
-        data = request.json
-        query = data.get('query', '')
-        context = data.get('context', [])
+        query = search_query.query
+        context = search_query.context
+        user_id = search_query.user_id
         
         logger.info(f"AI search query: {query}")
         logger.info(f"Context: {context}")
+        logger.info(f"User ID: {user_id}")
         
         if not query:
-            return jsonify({
-                'answer': 'Пожалуйста, укажите поисковый запрос.',
-                'sources': [],
-                'success': False
-            })
+            return AISearchResponse(
+                answer="Пожалуйста, укажите поисковый запрос.",
+                sources=[],
+                success=False
+            )
         
-        # Get relevant documents
-        docs = search_relevant_documents(query, context)
+        # Check user history for similar queries
+        similar_query = None
+        if user_id:
+            user_history = history_manager.get_user_history(user_id)
+            for entry in user_history:
+                if entry["query"].lower() == query.lower():
+                    similar_query = entry
+                    logger.info(f"Found exact match in user history: {entry['query']}")
+                    break
         
-        if not docs:
-            return jsonify({
-                'answer': 'К сожалению, не удалось найти подходящие материалы. Попробуйте переформулировать запрос или создать заявку для получения помощи от специалиста.',
-                'sources': [],
-                'success': False
-            })
+        # Check frequent queries if no match in user history
+        if not similar_query:
+            similar_query = history_manager.find_similar_query(query)
+            if similar_query:
+                logger.info(f"Found similar query in global history, count: {similar_query['count']}")
         
-        # Generate answer
-        answer = generate_answer(query, docs, context)
+        # If we have a good match with sufficient confidence, return its response
+        if similar_query and (isinstance(similar_query, dict) and similar_query.get("count", 0) > 2 or 
+                             similar_query.get("answer")):
+            
+            answer = similar_query.get("answer", "")
+            if not answer:
+                answer = similar_query.get("last_response", "")
+            
+            sources_data = similar_query.get("sources", [])
+            sources = []
+            
+            # Convert sources to the expected format
+            for source_data in sources_data:
+                source = Source(
+                    title=source_data.get("title", "Unknown"),
+                    id=source_data.get("id", ""),
+                    score=source_data.get("score", 0.0)
+                )
+                if "url" in source_data:
+                    source.url = source_data["url"]
+                sources.append(source)
+            
+            # Update user history
+            if user_id:
+                history_manager.update_user_history(user_id, query, {
+                    "answer": answer,
+                    "sources": sources_data
+                })
+            
+            return AISearchResponse(
+                answer=answer,
+                sources=sources,
+                success=True
+            )
+        
+        # Search for relevant pages in MediaWiki
+        mediawiki_results = mediawiki_client.search_pages(query)
+        
+        if not mediawiki_results:
+            error_response = AISearchResponse(
+                answer="К сожалению, не удалось найти подходящие материалы. Попробуйте переформулировать запрос или создать заявку для получения помощи.",
+                sources=[],
+                success=False
+            )
+            
+            # Still update history for unsuccessful queries
+            if user_id:
+                history_manager.update_user_history(user_id, query, {
+                    "answer": error_response.answer,
+                    "sources": []
+                })
+            
+            return error_response
+        
+        # Get most relevant result
+        top_result = mediawiki_results[0]
+        
+        # Get full page content if needed
+        content = top_result.get("content", "")
+        if len(content) < 100:  # If content is too short, get full content
+            full_content = mediawiki_client.get_page_content(top_result["id"])
+            if full_content:
+                content = full_content
+                # Limit to a reasonable size
+                if len(content) > 1000:
+                    content = content[:1000] + "..."
+        
+        # Generate an answer based on the page content
+        answer = f"Вот информация по вашему запросу '{query}':\n\n{content}\n\nПодробнее вы можете прочитать на странице \"{top_result['title']}\"."
         
         # Format sources for response
         sources = []
-        for doc in docs[:3]:  # Limit to top 3 sources
-            source = {
-                'title': doc.get('title', 'Документ без названия'),
-                'id': doc.get('id', ''),
-                'score': doc.get('score', 0)
-            }
-            
-            if 'url' in doc:
-                source['url'] = doc['url']
-            
+        for result in mediawiki_results[:3]:  # Top 3 sources
+            source = Source(
+                title=result["title"],
+                id=result["id"],
+                score=result["score"],
+                url=result.get("url")
+            )
             sources.append(source)
         
-        return jsonify({
-            'answer': answer,
-            'sources': sources,
-            'success': True
-        })
+        # Prepare response data for history
+        response_data = {
+            "answer": answer,
+            "sources": [s.dict() for s in sources]
+        }
         
-    except Exception as e:
-        logger.error(f"Error in search_ai: {str(e)}")
-        return jsonify({
-            'answer': 'Произошла ошибка при обработке запроса. Пожалуйста, попробуйте позже.',
-            'sources': [],
-            'success': False
-        }), 500
-
-def search_relevant_documents(query, context=None):
-    """
-    Search for relevant documents using semantic search
-    
-    Args:
-        query: Search query
-        context: Optional context from previous interactions
+        # Update history and frequent queries
+        if user_id:
+            history_manager.update_user_history(user_id, query, response_data)
+        history_manager.update_frequent_queries(query, response_data)
         
-    Returns:
-        List of relevant documents
-    """
-    try:
-        # If OpenSearch is available, use it for search
-        if opensearch:
-            # First try exact search
-            exact_docs = search_opensearch(query)
-            
-            # If we have sentence transformer model, try semantic search
-            if model and (not exact_docs or len(exact_docs) < 3):
-                # Get more documents for semantic reranking
-                more_docs = search_opensearch(query, size=10, exact_match=False)
-                semantic_docs = semantic_search(query, more_docs)
-                
-                # Combine and deduplicate results
-                all_docs = exact_docs + semantic_docs
-                unique_docs = []
-                doc_ids = set()
-                
-                for doc in all_docs:
-                    if doc['id'] not in doc_ids:
-                        doc_ids.add(doc['id'])
-                        unique_docs.append(doc)
-                
-                return unique_docs[:5]  # Return top 5
-            
-            return exact_docs
-        
-        # Fallback to mock data if OpenSearch is not available
-        return search_mock(query)
-        
-    except Exception as e:
-        logger.error(f"Error in search_relevant_documents: {str(e)}")
-        return []
-
-def search_opensearch(query, size=5, exact_match=True):
-    """
-    Search in OpenSearch
-    
-    Args:
-        query: Search query
-        size: Number of results to return
-        exact_match: Whether to use exact matching
-        
-    Returns:
-        List of documents
-    """
-    try:
-        if exact_match:
-            query_body = {
-                'query': {
-                    'multi_match': {
-                        'query': query,
-                        'fields': ['title^2', 'content', 'tags^1.5'],
-                        'type': 'best_fields'
-                    }
-                },
-                'size': size
-            }
-        else:
-            # More relaxed query for semantic reranking
-            query_body = {
-                'query': {
-                    'bool': {
-                        'should': [
-                            {'match': {'title': {'query': query, 'boost': 2.0}}},
-                            {'match': {'content': {'query': query}}},
-                            {'match': {'tags': {'query': query, 'boost': 1.5}}}
-                        ]
-                    }
-                },
-                'size': size
-            }
-        
-        response = opensearch.search(
-            body=query_body,
-            index=OPENSEARCH_INDEX
+        return AISearchResponse(
+            answer=answer,
+            sources=sources,
+            success=True
         )
         
-        results = []
-        for hit in response['hits']['hits']:
-            source = hit['_source']
-            result = {
-                'id': source.get('id', hit['_id']),
-                'title': source.get('title', 'Untitled'),
-                'content': source.get('content', ''),
-                'score': hit['_score'],
-                'source': source.get('source', 'opensearch')
-            }
-            
-            if 'url' in source:
-                result['url'] = source['url']
-                
-            if 'tags' in source:
-                result['tags'] = source['tags']
-                
-            results.append(result)
-            
-        return results
-        
     except Exception as e:
-        logger.error(f"Error in search_opensearch: {str(e)}")
-        return []
+        logger.error(f"Error in search_ai: {str(e)}", exc_info=True)
+        return AISearchResponse(
+            answer="Произошла ошибка при обработке запроса. Пожалуйста, попробуйте позже.",
+            sources=[],
+            success=False
+        )
 
-def semantic_search(query, documents):
-    """
-    Semantic search using sentence embeddings
-    
-    Args:
-        query: Search query
-        documents: List of documents to search in
-        
-    Returns:
-        List of documents sorted by semantic similarity
-    """
-    try:
-        if not model or not documents:
-            return []
-        
-        # Create query embedding
-        query_embedding = model.encode([query])[0]
-        
-        # Create document embeddings
-        doc_texts = []
-        for doc in documents:
-            # Combine title and content for better matching
-            doc_text = f"{doc.get('title', '')} {doc.get('content', '')}"
-            doc_texts.append(doc_text)
-        
-        doc_embeddings = model.encode(doc_texts)
-        
-        # Calculate similarities
-        similarities = cosine_similarity([query_embedding], doc_embeddings)[0]
-        
-        # Sort documents by similarity
-        doc_sims = list(zip(documents, similarities))
-        doc_sims.sort(key=lambda x: x[1], reverse=True)
-        
-        # Return documents with updated scores
-        results = []
-        for doc, sim in doc_sims:
-            doc_copy = doc.copy()
-            doc_copy['score'] = float(sim)
-            results.append(doc_copy)
-            
-        return results
-        
-    except Exception as e:
-        logger.error(f"Error in semantic_search: {str(e)}")
-        return []
-
-def search_mock(query):
-    """
-    Search in mock data (fallback)
-    
-    Args:
-        query: Search query
-        
-    Returns:
-        List of documents
-    """
-    mock_data = [
-        {
-            'id': 'mock1',
-            'title': 'Решение проблем с Wi-Fi подключением',
-            'content': '1. Перезагрузите роутер. 2. Проверьте настройки Wi-Fi на устройстве. 3. Убедитесь, что пароль вводится правильно.',
-            'tags': ['wi-fi', 'интернет', 'сеть', 'подключение'],
-            'source': 'mock',
-            'score': 1.0
-        },
-        {
-            'id': 'mock2',
-            'title': 'Исправление проблем с электронной почтой',
-            'content': '1. Проверьте подключение к интернету. 2. Убедитесь, что логин и пароль верны. 3. Очистите кэш приложения.',
-            'tags': ['email', 'почта', 'авторизация'],
-            'source': 'mock',
-            'score': 1.0
-        },
-        {
-            'id': 'mock3',
-            'title': 'Устранение неполадок с браузером',
-            'content': '1. Очистите историю и кэш браузера. 2. Обновите браузер до последней версии. 3. Проверьте настройки интернет-соединения.',
-            'tags': ['браузер', 'интернет', 'зависание'],
-            'source': 'mock',
-            'score': 1.0
-        }
-    ]
-    
-    query_lower = query.lower()
-    results = []
-    
-    for doc in mock_data:
-        score = 0
-        
-        # Check for keywords in title
-        if query_lower in doc['title'].lower():
-            score += 2
-        
-        # Check for keywords in content
-        if query_lower in doc['content'].lower():
-            score += 1
-        
-        # Check for keywords in tags
-        for tag in doc['tags']:
-            if query_lower in tag.lower():
-                score += 1
-                break
-        
-        if score > 0:
-            doc_copy = doc.copy()
-            doc_copy['score'] = score
-            results.append(doc_copy)
-    
-    # Sort by score
-    results.sort(key=lambda x: x['score'], reverse=True)
-    return results
-
-def generate_answer(query, documents, context=None):
-    """
-    Generate an answer based on relevant documents
-    
-    Args:
-        query: Search query
-        documents: Relevant documents
-        context: Optional context from previous interactions
-        
-    Returns:
-        Generated answer
-    """
-    if not documents:
-        return "К сожалению, не удалось найти информацию по вашему запросу. Пожалуйста, попробуйте переформулировать вопрос или создайте заявку для получения помощи."
-    
-    # Extract most relevant content
-    relevant_content = ""
-    for doc in documents[:3]:  # Use top 3 documents
-        relevant_content += f"{doc.get('title', '')}: {doc.get('content', '')}\n\n"
-    
-    # Simple answer generation based on most relevant document
-    top_doc = documents[0]
-    answer = f"{top_doc.get('content', '')}"
-    
-    # Clean up the answer
-    answer = answer.replace('1. ', '\n1. ')
-    answer = answer.replace('2. ', '\n2. ')
-    answer = answer.replace('3. ', '\n3. ')
-    
-    # Add introduction
-    intro = f"Вот решение для проблемы '{query}':\n"
-    
-    return intro + answer
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("app:app", host="0.0.0.0", port=5000, reload=True)

@@ -1,0 +1,172 @@
+/* Styles for the decision graph admin interface */
+
+.support-graph-admin-container {
+    margin: 1em 0;
+}
+
+/* Tabs */
+.support-graph-tabs {
+    display: flex;
+    margin-bottom: 15px;
+    border-bottom: 1px solid #ddd;
+}
+
+.support-graph-tab {
+    padding: 10px 15px;
+    background-color: #f8f9fa;
+    border: 1px solid #ddd;
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
+    margin-right: 5px;
+    cursor: pointer;
+}
+
+.support-graph-tab.active {
+    background-color: #fff;
+    border-bottom: 1px solid #fff;
+    margin-bottom: -1px;
+}
+
+/* Panels */
+.support-graph-panel {
+    margin-bottom: 20px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 15px;
+    background-color: #fff;
+}
+
+.support-graph-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.support-graph-add-button {
+    padding: 8px 15px;
+    background-color: #3366cc;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+/* Tables */
+.support-graph-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.support-graph-table th,
+.support-graph-table td {
+    padding: 8px;
+    border: 1px solid #ddd;
+    text-align: left;
+}
+
+.support-graph-table th {
+    background-color: #f8f9fa;
+}
+
+.support-graph-table tr:hover {
+    background-color: #f5f5f5;
+}
+
+.support-graph-table button {
+    padding: 5px 10px;
+    background-color: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+/* Editors */
+.support-graph-editor {
+    margin-top: 20px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 15px;
+    background-color: #f8f9fa;
+}
+
+.support-form-group {
+    margin-bottom: 15px;
+}
+
+.support-form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.support-input,
+.support-textarea,
+.support-select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.support-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 15px;
+}
+
+.support-submit-button,
+.support-cancel-button,
+.support-delete-button {
+    padding: 8px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-left: 10px;
+}
+
+.support-submit-button {
+    background-color: #3366cc;
+    color: white;
+    border: none;
+}
+
+.support-cancel-button {
+    background-color: #f8f9fa;
+    color: #333;
+    border: 1px solid #ddd;
+}
+
+.support-delete-button {
+    background-color: #dc3545;
+    color: white;
+    border: none;
+}
+
+/* Graph visualization */
+.support-graph-visualization {
+    min-height: 400px;
+    border: 1px solid #ddd;
+    padding: 15px;
+    background-color: white;
+}
+
+/* Save button */
+.support-graph-save-container {
+    margin-top: 20px;
+    text-align: right;
+}
+
+.support-graph-save-button {
+    padding: 10px 20px;
+    background-color: #28a745;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1.1em;
+}
+
+.support-graph-save-status {
+    margin-left: 10px;
+    font-style: italic;
+}

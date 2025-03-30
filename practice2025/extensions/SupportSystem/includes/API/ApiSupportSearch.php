@@ -46,7 +46,20 @@ class ApiSupportSearch extends ApiBase
             $this->getResult()->addValue(null, 'results', $results);
         } else {
             // AI search
-            $aiResult = $searchModule->searchAI($query, $context);
+            // Get user ID for tracking context
+            $userId = null;
+            $user = $this->getUser();
+            if ($user && !$user->isAnon()) {
+                $userId = 'user_' . $user->getId();
+            } else {
+                // For anonymous users, use session ID if available
+                $session = $this->getRequest()->getSession();
+                if ($session) {
+                    $userId = 'anon_' . $session->getId();
+                }
+            }
+
+            $aiResult = $searchModule->searchAI($query, $context, $userId);
             $this->getResult()->addValue(null, 'ai_result', $aiResult);
         }
     }

@@ -8,26 +8,30 @@ use MediaWiki\Extension\SupportSystem\ServiceDesk;
 /**
  * API module for ticket management
  */
-class ApiSupportTicket extends ApiBase {
-	/**
-	 * Execute the API module
-	 */
-	public function execute() {
-		$params = $this->extractRequestParams();
-		$action = $params['action'];
-		
-		$serviceDesk = new ServiceDesk();
-		
-		switch ( $action ) {
-            case 'create':
-                $this->requirePostedParameters(['subject', 'description']);
+class ApiSupportTicket extends ApiBase
+{
+    /**
+     * Execute the API module
+     */
+    public function execute()
+    {
+        $params = $this->extractRequestParams();
+        $ticketOperation = $params['operation']; // Используем другое имя параметра
 
-                $subject = $params['subject'];
-                $description = $params['description'];
-                $priority = $params['priority'];
-                $assignedTo = $params['assigned_to'];
+        $serviceDesk = new ServiceDesk();
 
-                try {
+        try {
+            switch ($ticketOperation) {
+                case 'create':
+                    $this->requirePostedParameters(['subject', 'description']);
+
+                    $subject = $params['subject'];
+                    $description = $params['description'];
+                    $priority = $params['priority'];
+                    $assignedTo = $params['assigned_to'];
+
+                    wfDebugLog('SupportSystem', "API: Creating ticket with subject: $subject");
+
                     $ticket = $serviceDesk->createTicket(
                         $subject,
                         $description,
@@ -35,74 +39,76 @@ class ApiSupportTicket extends ApiBase {
                         $assignedTo
                     );
 
+                    wfDebugLog('SupportSystem', "API: Ticket created successfully");
                     $this->getResult()->addValue(null, 'ticket', $ticket);
-                } catch (\Exception $e) {
-                    $this->dieWithError($e->getMessage());
-                }
-                break;
+                    break;
 
-            case 'get':
-                $ticketId = $params['ticket_id'];
+                case 'get':
+                    $ticketId = $params['ticket_id'];
 
-                if (!$ticketId) {
-                    $this->dieWithError(['apierror-invalidparameter', 'ticket_id']);
-                }
+                    if (!$ticketId) {
+                        $this->dieWithError(['apierror-invalidparameter', 'ticket_id']);
+                    }
 
-                $ticket = $serviceDesk->getTicket($ticketId);
+                    $ticket = $serviceDesk->getTicket($ticketId);
 
-                if ($ticket === null) {
-                    $this->dieWithError('supportsystem-error-ticket-not-found');
-                }
+                    if ($ticket === null) {
+                        $this->dieWithError('supportsystem-error-ticket-not-found');
+                    }
 
-                $this->getResult()->addValue(null, 'ticket', $ticket);
-                break;
+                    $this->getResult()->addValue(null, 'ticket', $ticket);
+                    break;
 
-            case 'list':
-                $tickets = $serviceDesk->getAllTickets();
-                $this->getResult()->addValue(null, 'tickets', $tickets);
-                break;
+                case 'list':
+                    $tickets = $serviceDesk->getAllTickets();
+                    $this->getResult()->addValue(null, 'tickets', $tickets);
+                    break;
 
-            case 'comment':
-                $this->requirePostedParameters(['ticket_id', 'comment']);
+                case 'comment':
+                    $this->requirePostedParameters(['ticket_id', 'comment']);
 
-                $ticketId = $params['ticket_id'];
-                $comment = $params['comment'];
+                    $ticketId = $params['ticket_id'];
+                    $comment = $params['comment'];
 
-                if (!$ticketId) {
-                    $this->dieWithError(['apierror-invalidparameter', 'ticket_id']);
-                }
+                    if (!$ticketId) {
+                        $this->dieWithError(['apierror-invalidparameter', 'ticket_id']);
+                    }
 
-                $success = $serviceDesk->addComment($ticketId, $comment);
+                    $success = $serviceDesk->addComment($ticketId, $comment);
 
-                if (!$success) {
-                    $this->dieWithError('supportsystem-error-add-comment-failed');
-                }
+                    if (!$success) {
+                        $this->dieWithError('supportsystem-error-add-comment-failed');
+                    }
 
-                $this->getResult()->addValue(null, 'result', 'success');
-                break;
+                    $this->getResult()->addValue(null, 'result', 'success');
+                    break;
 
-            case 'solution':
-                $this->requirePostedParameters(['ticket_id', 'solution']);
+                case 'solution':
+                    $this->requirePostedParameters(['ticket_id', 'solution']);
 
-                $ticketId = $params['ticket_id'];
-                $solution = $params['solution'];
-                $source = $params['source'];
+                    $ticketId = $params['ticket_id'];
+                    $solution = $params['solution'];
+                    $source = $params['source'];
 
-                if (!$ticketId) {
-                    $this->dieWithError(['apierror-invalidparameter', 'ticket_id']);
-                }
+                    if (!$ticketId) {
+                        $this->dieWithError(['apierror-invalidparameter', 'ticket_id']);
+                    }
 
-                $success = $serviceDesk->attachSolution($ticketId, $solution, $source);
+                    $success = $serviceDesk->attachSolution($ticketId, $solution, $source);
 
-                if (!$success) {
-                    $this->dieWithError('supportsystem-error-attach-solution-failed');
-                }
+                    if (!$success) {
+                        $this->dieWithError('supportsystem-error-attach-solution-failed');
+                    }
 
-                $this->getResult()->addValue(null, 'result', 'success');
-                break;
+                    $this->getResult()->addValue(null, 'result', 'success');
+                    break;
 
-            default:
-                $this->dieWithError(['apierror-invalidparameter', 'action']);
+                default:
+                    $this->dieWithError(['apierror-invalidparameter', 'operation']);
+            }
+        } catch (\Exception $e) {
+            wfDebugLog('SupportSystem', "API exception: " . $e->getMessage());
+            $this->dieWithError($e->getMessage());
         }
     }
 
@@ -113,7 +119,7 @@ class ApiSupportTicket extends ApiBase {
     public function getAllowedParams()
     {
         return [
-            'action' => [
+            'operation' => [ // Изменение имени параметра
                 ApiBase::PARAM_TYPE => ['create', 'get', 'list', 'comment', 'solution'],
                 ApiBase::PARAM_REQUIRED => true,
             ],
@@ -161,11 +167,11 @@ class ApiSupportTicket extends ApiBase {
     public function getExamplesMessages()
     {
         return [
-            'action=supportticket&action=create&subject=Test&description=Test%20description&priority=normal' => 'apihelp-supportticket-example-1',
-            'action=supportticket&action=get&ticket_id=1' => 'apihelp-supportticket-example-2',
-            'action=supportticket&action=list' => 'apihelp-supportticket-example-3',
-            'action=supportticket&action=comment&ticket_id=1&comment=Test%20comment' => 'apihelp-supportticket-example-4',
-            'action=supportticket&action=solution&ticket_id=1&solution=Test%20solution&source=manual' => 'apihelp-supportticket-example-5',
+            'action=supportticket&operation=create&subject=Test&description=Test%20description&priority=normal' => 'apihelp-supportticket-example-1',
+            'action=supportticket&operation=get&ticket_id=1' => 'apihelp-supportticket-example-2',
+            'action=supportticket&operation=list' => 'apihelp-supportticket-example-3',
+            'action=supportticket&operation=comment&ticket_id=1&comment=Test%20comment' => 'apihelp-supportticket-example-4',
+            'action=supportticket&operation=solution&ticket_id=1&solution=Test%20solution&source=manual' => 'apihelp-supportticket-example-5',
         ];
     }
 
@@ -176,6 +182,6 @@ class ApiSupportTicket extends ApiBase {
     public function isWriteMode()
     {
         $params = $this->extractRequestParams();
-        return in_array($params['action'], ['create', 'comment', 'solution']);
+        return in_array($params['operation'], ['create', 'comment', 'solution']);
     }
 }

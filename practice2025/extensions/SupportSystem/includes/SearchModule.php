@@ -7,39 +7,43 @@ use Http;
 use MWException;
 
 /**
- * Class for searching solutions in OpenSearch
+ * Class for searching solutions
  */
 class SearchModule {
-	/** @var string The OpenSearch host */
-	private $host;
-	
-	/** @var int The OpenSearch port */
-	private $port;
-	
-	/** @var string The OpenSearch index name */
-	private $indexName;
-	
-	/** @var bool Whether to use mock data */
-	private $useMock;
-	
-	/** @var array Mock data for testing */
-	private $mockData;
-	
-	/**
-	 * Constructor
-	 */
-	public function __construct() {
-		$config = MediaWikiServices::getInstance()->getMainConfig();
-		
-		$this->host = $config->get( 'SupportSystemOpenSearchHost' );
-		$this->port = $config->get( 'SupportSystemOpenSearchPort' );
-		$this->indexName = $config->get( 'SupportSystemOpenSearchIndex' );
-		$this->useMock = $config->get( 'SupportSystemUseMock' );
-		
-		if ( $this->useMock ) {
-			$this->loadMockData();
-		}
-	}
+    /** @var string The OpenSearch host */
+    private $host;
+    
+    /** @var int The OpenSearch port */
+    private $port;
+    
+    /** @var string The OpenSearch index name */
+    private $indexName;
+    
+    /** @var bool Whether to use mock data */
+    private $useMock;
+    
+    /** @var string The AI service URL */
+    private $aiServiceUrl;
+    
+    /** @var array Mock data for testing */
+    private $mockData;
+    
+    /**
+     * Constructor
+     */
+    public function __construct() {
+        $config = MediaWikiServices::getInstance()->getMainConfig();
+        
+        $this->host = $config->get( 'SupportSystemOpenSearchHost' );
+        $this->port = $config->get( 'SupportSystemOpenSearchPort' );
+        $this->indexName = $config->get( 'SupportSystemOpenSearchIndex' );
+        $this->useMock = $config->get( 'SupportSystemUseMock' );
+        $this->aiServiceUrl = $config->get( 'SupportSystemAIServiceURL' );
+        
+        if ( $this->useMock ) {
+            $this->loadMockData();
+        }
+    }
 	
 	/**
 	 * Load mock data for testing
@@ -311,50 +315,133 @@ class SearchModule {
         return $response !== false;
     }
 
-    /**
-     * Search via AI service for more complex queries
-     * @param string $query The search query
-     * @param array $context Previous context (optional)
-     * @return array
-     */
-    public function searchAI(string $query, array $context = []): array
-    {
-        $config = MediaWikiServices::getInstance()->getMainConfig();
-        $aiServiceUrl = $config->get('SupportSystemAIServiceURL');
+	/**
+	 * Search via AI service for more complex queries
+	 * 
+	 * @param string $query The search query
+	 * @param array $context Previous context (optional)
+	 * @param string|null $userId User ID for tracking context (optional)
+	 * @return array
+	 */
+	public function searchAI(string $query, array $context = [], string $userId = null): array
+	{
+		try {
+			$url = "{$this->aiServiceUrl}/api/search_ai";
 
-        $url = "{$aiServiceUrl}/api/search_ai";
+			$requestData = [
+				'query' => $query,
+				'context' => $context
+			];
 
-        $requestData = [
-            'query' => $query,
-            'context' => $context
-        ];
+			// Add user ID if available for context tracking
+			if ($userId !== null) {
+				$requestData['user_id'] = $userId;
+			}
 
-        $options = [
-            'method' => 'POST',
-            'timeout' => 30, // Longer timeout for AI processing
-            'postData' => json_encode($requestData),
-            'headers' => [
-                'Content-Type' => 'application/json'
-            ]
-        ];
+			$options = [
+				'method' => 'POST',
+				'timeout' => 30, // Longer timeout for AI processing
+				'postData' => json_encode($requestData),
+				'headers' => [
+					'Content-Type' => 'application/json'
+				]
+			];
 
-        $response = Http::request($url, $options);
+			\Wikimedia\Logger\LoggerFactory::getInstance('SupportSystem')->info(
+				'Making AI search request',
+				[
+					'query' => $query,
+					'userId' => $userId
+				]
+			);
 
-        if ($response === false) {
-            // Return fallback answer if AI service is unavailable
-            return [
-                'answer' => 'К сожалению, интеллектуальный поиск временно недоступен. Пожалуйста, попробуйте снова позже или воспользуйтесь стандартным поиском.',
-                'sources' => [],
-                'success' => false
-            ];
-        }
+			$response = Http::request($url, $options);
 
-        $data = json_decode($response, true);
+			if ($response === false) {
+				\Wikimedia\Logger\LoggerFactory::getInstance('SupportSystem')->error(
+					'AI service unavailable',
+					[
+						'query' => $query
+					]
+				);
 
-        return $data ?? [
-            'answer' => 'Не удалось обработать ответ от сервиса ИИ. Пожалуйста, попробуйте снова позже.',
-            'sources' => [],
-            'success' => false
-        ];
-    }
+				// Return fallback answer if AI service is unavailable
+				return [
+					'answer' => 'К сожалению, интеллектуальный поиск временно недоступен. Пожалуйста, попробуйте снова позже или воспользуйтесь стандартным поиском.',
+					'sources' => [],
+					'success' => false
+				];
+			}
+
+			$data = json_decode($response, true);
+
+			// Improved error handling and logging
+			if (!$data || !isset($data['answer'])) {
+				\Wikimedia\Logger\LoggerFactory::getInstance('SupportSystem')->error(
+					'Invalid AI service response',
+					[
+						'response' => $response,
+						'query' => $query
+					]
+				);
+
+				return [
+					'answer' => 'Не удалось обработать ответ от сервиса ИИ. Пожалуйста, попробуйте снова позже.',
+					'sources' => [],
+					'success' => false
+				];
+			}
+
+			\Wikimedia\Logger\LoggerFactory::getInstance('SupportSystem')->info(
+				'AI search successful',
+				[
+					'query' => $query,
+					'hasResults' => isset($data['sources']) && count($data['sources']) > 0
+				]
+			);
+
+			return $data;
+		} catch (\Exception $e) {
+			\Wikimedia\Logger\LoggerFactory::getInstance('SupportSystem')->error(
+				'Error in searchAI',
+				[
+					'exception' => $e->getMessage(),
+					'query' => $query
+				]
+			);
+
+			return [
+				'answer' => 'Произошла ошибка при выполнении интеллектуального поиска. Пожалуйста, попробуйте снова позже.',
+				'sources' => [],
+				'success' => false
+			];
+		}
+	}
+	/**
+	 * Check AI service availability
+	 * @return bool
+	 */
+	public function isAIServiceAvailable(): bool
+	{
+		try {
+			$url = "{$this->aiServiceUrl}/";
+
+			$options = [
+				'method' => 'GET',
+				'timeout' => 5 // Short timeout for health check
+			];
+
+			$response = Http::request($url, $options);
+
+			if ($response === false) {
+				return false;
+			}
+
+			$data = json_decode($response, true);
+
+			return isset($data['status']) && $data['status'] === 'ok';
+		} catch (\Exception $e) {
+			return false;
+		}
+	}
 }

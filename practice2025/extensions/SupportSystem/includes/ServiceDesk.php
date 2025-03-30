@@ -87,10 +87,15 @@ class ServiceDesk
      * @param int|null $assignedTo User ID to assign the ticket to
      * @param int $projectId Project ID
      * @return array The created ticket
+     * @throws MWException When ticket creation fails
      */
     public function createTicket(string $subject, string $description, string $priority = 'normal', int $assignedTo = null, int $projectId = 1): array
     {
+        // Log the ticket creation attempt
+        wfDebugLog('SupportSystem', "Creating ticket: $subject, Priority: $priority");
+
         if ($this->useMock) {
+            wfDebugLog('SupportSystem', "Using mock data for ticket creation");
             return $this->createMockTicket($subject, $description, $priority, $assignedTo, $projectId);
         }
 
@@ -109,11 +114,12 @@ class ServiceDesk
             $issueData['issue']['assigned_to_id'] = $assignedTo;
         }
 
-        $url = "{$this->apiUrl}/issues.json";
+        $url = rtrim($this->apiUrl, '/') . "/issues.json";
+        wfDebugLog('SupportSystem', "Redmine API URL: $url");
 
         $options = [
             'method' => 'POST',
-            'timeout' => 10,
+            'timeout' => 30, // Increased timeout
             'postData' => json_encode($issueData),
             'headers' => [
                 'Content-Type' => 'application/json',
@@ -121,18 +127,28 @@ class ServiceDesk
             ]
         ];
 
+        // Log the request data
+        wfDebugLog('SupportSystem', "Request data: " . json_encode($issueData));
+
+        // Make the API request
         $response = Http::request($url, $options);
 
         if ($response === false) {
-            throw new MWException('Error connecting to Redmine');
+            wfDebugLog('SupportSystem', "Error connecting to Redmine: No response");
+            throw new MWException('Error connecting to Redmine: No response received');
         }
+
+        // Log the response
+        wfDebugLog('SupportSystem', "Redmine response: $response");
 
         $data = json_decode($response, true);
 
         if (!isset($data['issue'])) {
-            throw new MWException('Failed to create ticket: ' . $response);
+            wfDebugLog('SupportSystem', "Failed to create ticket: " . substr($response, 0, 500));
+            throw new MWException('Failed to create ticket: ' . substr($response, 0, 500));
         }
 
+        wfDebugLog('SupportSystem', "Ticket created successfully: ID " . $data['issue']['id']);
         return $data['issue'];
     }
 
@@ -186,11 +202,11 @@ class ServiceDesk
             return null;
         }
 
-        $url = "{$this->apiUrl}/issues/{$ticketId}.json";
+        $url = rtrim($this->apiUrl, '/') . "/issues/{$ticketId}.json";
 
         $options = [
             'method' => 'GET',
-            'timeout' => 10,
+            'timeout' => 30,
             'headers' => [
                 'X-Redmine-API-Key' => $this->apiKey
             ]
@@ -199,12 +215,18 @@ class ServiceDesk
         $response = Http::request($url, $options);
 
         if ($response === false) {
+            wfDebugLog('SupportSystem', "Error retrieving ticket #$ticketId: No response");
             return null;
         }
 
         $data = json_decode($response, true);
 
-        return $data['issue'] ?? null;
+        if (!isset($data['issue'])) {
+            wfDebugLog('SupportSystem', "Error retrieving ticket #$ticketId: " . substr($response, 0, 100));
+            return null;
+        }
+
+        return $data['issue'];
     }
 
     /**
@@ -217,11 +239,11 @@ class ServiceDesk
             return $this->mockTickets;
         }
 
-        $url = "{$this->apiUrl}/issues.json";
+        $url = rtrim($this->apiUrl, '/') . "/issues.json";
 
         $options = [
             'method' => 'GET',
-            'timeout' => 10,
+            'timeout' => 30,
             'headers' => [
                 'X-Redmine-API-Key' => $this->apiKey
             ]
@@ -230,53 +252,18 @@ class ServiceDesk
         $response = Http::request($url, $options);
 
         if ($response === false) {
+            wfDebugLog('SupportSystem', "Error retrieving all tickets: No response");
             return [];
         }
 
         $data = json_decode($response, true);
 
-        return $data['issues'] ?? [];
-    }
-
-    /**
-     * Update a ticket
-     * @param int $ticketId Ticket ID
-     * @param array $data Ticket data to update
-     * @return bool Whether the update was successful
-     */
-    public function updateTicket(int $ticketId, array $data): bool
-    {
-        if ($this->useMock) {
-            foreach ($this->mockTickets as $key => $ticket) {
-                if ($ticket['id'] === $ticketId) {
-                    $this->mockTickets[$key] = array_merge($ticket, $data);
-                    $this->saveMockData();
-                    return true;
-                }
-            }
-
-            return false;
+        if (!isset($data['issues'])) {
+            wfDebugLog('SupportSystem', "Error retrieving all tickets: " . substr($response, 0, 100));
+            return [];
         }
 
-        $issueData = [
-            'issue' => $data
-        ];
-
-        $url = "{$this->apiUrl}/issues/{$ticketId}.json";
-
-        $options = [
-            'method' => 'PUT',
-            'timeout' => 10,
-            'postData' => json_encode($issueData),
-            'headers' => [
-                'Content-Type' => 'application/json',
-                'X-Redmine-API-Key' => $this->apiKey
-            ]
-        ];
-
-        $response = Http::request($url, $options);
-
-        return $response !== false;
+        return $data['issues'];
     }
 
     /**
@@ -313,11 +300,11 @@ class ServiceDesk
             ]
         ];
 
-        $url = "{$this->apiUrl}/issues/{$ticketId}.json";
+        $url = rtrim($this->apiUrl, '/') . "/issues/{$ticketId}.json";
 
         $options = [
             'method' => 'PUT',
-            'timeout' => 10,
+            'timeout' => 30,
             'postData' => json_encode($issueData),
             'headers' => [
                 'Content-Type' => 'application/json',
@@ -327,7 +314,13 @@ class ServiceDesk
 
         $response = Http::request($url, $options);
 
-        return $response !== false;
+        if ($response === false) {
+            wfDebugLog('SupportSystem', "Error adding comment to ticket #$ticketId: No response");
+            return false;
+        }
+
+        // For Redmine, a successful update returns 204 No Content
+        return true;
     }
 
     /**

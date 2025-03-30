@@ -8,6 +8,7 @@
     var allResults = [];
     var selectedSolution = '';
     var selectedSource = '';
+    var searchContext = [];
 
     /**
      * Initialize the search page
@@ -80,7 +81,7 @@
         });
 
         // Try AI search button
-        $('#support-search-ai-button').on('click', function () {
+        $(document).on('click', '#support-search-ai-button', function () {
             var query = $('#support-search-input').val().trim();
             if (query) {
                 searchWithAI(query);
@@ -119,9 +120,8 @@
                 allResults = data.results;
                 displayResults(allResults);
             } else {
-                $('#support-search-results').html(
-                    '<div class="support-no-results">' +
-                    mw.msg('supportsystem-search-no-results') +
+                $('#support-search-results').html('<div class="support-no-results">' +
+                    mw.msg('supportsystem-search-noresults') +
                     '</div>' +
                     '<div class="support-try-ai">' +
                     '<button id="support-search-ai-button" class="support-search-ai-button">' +
@@ -157,14 +157,25 @@
         api.get({
             action: 'supportsearch',
             query: query,
-            use_ai: 1
+            use_ai: 1,
+            context: JSON.stringify(searchContext)
         }).done(function (data) {
             if (data.ai_result && data.ai_result.success) {
+                // Update search context with this query
+                if (searchContext.length >= 5) {
+                    searchContext.shift(); // Remove oldest query if we have more than 5
+                }
+
+                searchContext.push({
+                    query: query,
+                    timestamp: new Date().toISOString()
+                });
+
                 displayAIResult(data.ai_result);
             } else {
                 $('#support-search-results').html(
                     '<div class="support-error">' +
-                    (data.ai_result.answer || mw.msg('supportsystem-search-ai-error')) +
+                    (data.ai_result && data.ai_result.answer ? data.ai_result.answer : mw.msg('supportsystem-search-ai-error')) +
                     '</div>'
                 );
             }
@@ -186,7 +197,13 @@
         var resultsHtml = '<div class="support-ai-result">';
 
         resultsHtml += '<h3>' + mw.msg('supportsystem-search-ai-result-title') + '</h3>';
-        resultsHtml += '<div class="support-ai-answer">' + aiResult.answer + '</div>';
+
+        // Format answer with proper line breaks and lists
+        var formattedAnswer = aiResult.answer
+            .replace(/\n/g, '<br>')
+            .replace(/(\d+\. )/g, '<br>$1');
+
+        resultsHtml += '<div class="support-ai-answer">' + formattedAnswer + '</div>';
 
         // Show sources if available
         if (aiResult.sources && aiResult.sources.length > 0) {
@@ -341,6 +358,9 @@
             priority: $('#support-ticket-priority').val()
         };
 
+        $('#support-submit-ticket').prop('disabled', true);
+        $('#support-submit-ticket').text(mw.msg('supportsystem-dt-submitting'));
+
         api.post({
             action: 'supportticket',
             action: 'create',
@@ -351,10 +371,16 @@
             if (data.ticket) {
                 // Attach solution to the ticket
                 attachSolution(data.ticket.id);
+            } else {
+                mw.notify(mw.msg('supportsystem-search-ticket-error'), { type: 'error' });
+                $('#support-submit-ticket').prop('disabled', false);
+                $('#support-submit-ticket').text(mw.msg('supportsystem-dt-submit'));
             }
         }).fail(function (error) {
             mw.notify(mw.msg('supportsystem-search-ticket-error'), { type: 'error' });
             console.error('Error creating ticket:', error);
+            $('#support-submit-ticket').prop('disabled', false);
+            $('#support-submit-ticket').text(mw.msg('supportsystem-dt-submit'));
         });
     }
 
@@ -386,6 +412,8 @@
      */
     function showTicketSuccess(ticketId) {
         $('#support-ticket-form').addClass('support-hidden');
+        $('#support-submit-ticket').prop('disabled', false);
+        $('#support-submit-ticket').text(mw.msg('supportsystem-dt-submit'));
 
         mw.notify(mw.msg('supportsystem-search-ticket-created', ticketId), {
             type: 'success',

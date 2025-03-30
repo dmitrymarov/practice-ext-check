@@ -17,14 +17,11 @@
     },
     "SpecialPages": 
     {
-        "DecisionTree": {
-            "class": "MediaWiki\\Extension\\SupportSystem\\Special\\SpecialDecisionTree"
+        "UnifiedSupport": {
+            "class": "MediaWiki\\Extension\\SupportSystem\\Special\\SpecialUnifiedSupport"
         },
-        "SearchSolutions": {
-            "class": "MediaWiki\\Extension\\SupportSystem\\Special\\SpecialSearchSolutions"
-        },
-        "ServiceDesk": {
-            "class": "MediaWiki\\Extension\\SupportSystem\\Special\\SpecialServiceDesk"
+        "DecisionGraphAdmin": {
+            "class": "MediaWiki\\Extension\\SupportSystem\\Special\\SpecialDecisionGraphAdmin"
         }
     },
     "APIModules": {
@@ -36,6 +33,9 @@
         },
         "supportticket": {
             "class":"MediaWiki\\Extension\\SupportSystem\\API\\ApiSupportTicket"
+        },
+        "supportgraphadmin": {
+            "class": "MediaWiki\\Extension\\SupportSystem\\API\\ApiSupportGraphAdmin"
         }
     },
     "Hooks": {
@@ -49,57 +49,109 @@
         },
         "ext.supportSystem.decisionTree": {
             "scripts": [
-                "modules/js/decisionTree.js"
+                "modules/js/unified.js"
             ],
             "styles": [
-                "modules/css/decisionTree.css"
+                "modules/css/unified.css"
             ],
             "dependencies": [
                 "mediawiki.api",
                 "mediawiki.util"
             ],
             "messages": [
+                "supportsystem-unified-title",
+                "supportsystem-unified-desc",
+                "supportsystem-tab-dialog",
+                "supportsystem-tab-search",
+                "supportsystem-tab-tickets",
+                "supportsystem-dialog-title",
+                "supportsystem-dialog-desc",
+                "supportsystem-dt-welcome",
                 "supportsystem-dt-start",
                 "supportsystem-dt-restart",
-                "supportsystem-dt-next",
+                "supportsystem-dt-create-ticket",
+                "supportsystem-dt-ai-search",
+                "supportsystem-dt-wiki-search",
+                "supportsystem-dt-solution-header",
+                "supportsystem-dt-ai-header",
+                "supportsystem-dt-ai-sources",
+                "supportsystem-dt-ai-accept",
+                "supportsystem-dt-ai-loading",
                 "supportsystem-dt-back",
-                "supportsystem-dt-solution"
-            ]
-        },
-        "ext.supportSystem.search": {
-            "scripts": [
-                "modules/js/search.js"
-            ],
-            "styles": [
-                "modules/css/search.css"
-            ],
-            "dependencies": [
-                "mediawiki.api",
-                "mediawiki.util"
-            ],
-            "messages": [
+                "supportsystem-dt-back",
+                "supportsystem-dt-ticket-header",
+                "supportsystem-dt-ticket-subject",
+                "supportsystem-dt-ticket-description",
+                "supportsystem-dt-ticket-priority",
+                "supportsystem-dt-priority-low",
+                "supportsystem-dt-priority-normal",
+                "supportsystem-dt-priority-high",
+                "supportsystem-dt-priority-urgent",
+                "supportsystem-dt-cancel",
+                "supportsystem-dt-submit",
+                "supportsystem-dt-submitting",
+                "supportsystem-dt-error-loading-node",
+                "supportsystem-dt-error-creating-ticket",
+                "supportsystem-dt-dialog-history",
+                "supportsystem-dt-dialog-item",
+                "supportsystem-dt-dialog-solution",
                 "supportsystem-search-title",
+                "supportsystem-search-desc",
                 "supportsystem-search-button",
                 "supportsystem-search-placeholder",
-                "supportsystem-search-noresults"
+                "supportsystem-search-use-ai",
+                "supportsystem-search-initial",
+                "supportsystem-search-loading",
+                "supportsystem-search-empty-query",
+                "supportsystem-search-noresults",
+                "supportsystem-search-error",
+                "supportsystem-search-ai-result-title",
+                "supportsystem-search-ai-sources",
+                "supportsystem-search-source-opensearch",
+                "supportsystem-search-source-mediawiki",
+                "supportsystem-search-source-ai",
+                "supportsystem-search-source-unknown",
+                "supportsystem-search-tags",
+                "supportsystem-search-relevance",
+                "supportsystem-search-source-link",
+                "supportsystem-search-create-ticket",
+                "supportsystem-search-create-ticket-ai",
+                "supportsystem-search-default-subject",
+                "supportsystem-search-default-description",
+                "supportsystem-search-source",
+                "supportsystem-tickets-title",
+                "supportsystem-tickets-desc",
+                "supportsystem-sd-new",
+                "supportsystem-sd-loading",
+                "supportsystem-sd-empty",
+                "supportsystem-sd-error",
+                "supportsystem-sd-ticket-back",
+                "supportsystem-sd-ticket-status",
+                "supportsystem-sd-ticket-priority",
+                "supportsystem-sd-ticket-created",
+                "supportsystem-sd-ticket-description",
+                "supportsystem-sd-ticket-comments",
+                "supportsystem-sd-ticket-add-comment",
+                "supportsystem-sd-ticket-comment-placeholder",
+                "supportsystem-sd-ticket-comment-required",
+                "supportsystem-sd-ticket-comment-submit",
+                "supportsystem-sd-ticket-comment-error",
+                "supportsystem-sd-ticket-comment-success",
+                "supportsystem-sd-ticket-no-comments",
+                "supportsystem-sd-ticket-subject-required",
+                "supportsystem-sd-ticket-description-required"
             ]
         },
-        "ext.supportSystem.serviceDesk": {
+        "ext.supportSystem.graphAdmin": {
             "scripts": [
-                "modules/js/serviceDesk.js"
+                "modules/js/graphAdmin.js"
             ],
             "styles": [
-                "modules/css/serviceDesk.css"
+                "modules/css/graphAdmin.css"
             ],
             "dependencies": [
                 "mediawiki.api",
                 "mediawiki.util"
-            ],
-            "messages": [
-                "supportsystem-sd-title",
-                "supportsystem-sd-new",
-                "supportsystem-sd-list",
-                "supportsystem-sd-submit"
             ]
         }
     },
@@ -129,7 +181,7 @@
             "value": "http://redmine:3000"
         },
         "SupportSystemRedmineAPIKey": {
-            "value": "api-kek-lulz"
+            "value": "c177337d75a1da3bb43d67ec9b9bb139b299502f"
         },
         "SupportSystemAIServiceURL": {
             "value": "http://ai-service:5000"

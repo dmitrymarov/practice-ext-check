@@ -8,6 +8,7 @@
     var currentNodeId = 'root';
     var currentSolution = '';
     var dialogHistory = [];
+    var messages = mw.config.get('dtMessages') || {};
 
     /**
      * Initialize the dialog
@@ -108,7 +109,7 @@
             // Scroll chat to bottom
             scrollToBottom();
         }).fail(function (error) {
-            mw.notify(mw.msg('supportsystem-dt-error-loading-node'), { type: 'error' });
+            mw.notify(messages.error_loading_node || 'Error loading node', { type: 'error' });
             console.error('Error loading node:', error);
         });
     }
@@ -280,7 +281,7 @@
         });
 
         // Show loading message
-        $('#support-dt-ai-text').text(mw.msg('supportsystem-dt-ai-loading'));
+        $('#support-dt-ai-text').text(messages.ai_loading || 'AI is analyzing the problem...');
         $('#support-dt-ai-sources').hide();
         $('#support-dt-ai-container').show();
         $('#support-dt-solution-container').hide();
@@ -320,11 +321,12 @@
                 }
             } else {
                 // Show error message
-                $('#support-dt-ai-text').text(data.ai_result.answer || mw.msg('supportsystem-dt-ai-error'));
+                $('#support-dt-ai-text').text(data.ai_result && data.ai_result.answer ||
+                    messages.ai_error || 'An error occurred while processing the AI request. Please try again later.');
                 $('#support-dt-ai-sources').hide();
             }
         }).fail(function (error) {
-            $('#support-dt-ai-text').text(mw.msg('supportsystem-dt-ai-error'));
+            $('#support-dt-ai-text').text(messages.ai_error || 'An error occurred while processing the AI request. Please try again later.');
             $('#support-dt-ai-sources').hide();
             console.error('Error in AI search:', error);
         });

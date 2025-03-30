@@ -7,14 +7,12 @@ $specialPageAliases = [];
 
 /** English (English) */
 $specialPageAliases['en'] = [
-    'DecisionTree' => ['DecisionTree', 'Decision_Tree', 'SupportDialog'],
-    'SearchSolutions' => ['SearchSolutions', 'Search_Solutions', 'SupportSearch'],
-    'ServiceDesk' => ['ServiceDesk', 'Service_Desk', 'SupportTickets', 'Tickets'],
+    'UnifiedSupport' => ['UnifiedSupport', 'Support', 'SupportSystem'],
+    'DecisionGraphAdmin' => ['DecisionGraphAdmin', 'GraphAdmin'],
 ];
 
 /** Russian (Русский) */
 $specialPageAliases['ru'] = [
-    'DecisionTree' => ['ДеревоРешений', 'Дерево_решений', 'ДиалогПоддержки'],
-    'SearchSolutions' => ['ПоискРешений', 'Поиск_решений', 'ПоискПоддержки'],
-    'ServiceDesk' => ['СлужбаПоддержки', 'Служба_поддержки', 'ЗаявкиПоддержки', 'Заявки'],
+    'UnifiedSupport' => ['СистемаПоддержки', 'Поддержка', 'Помощь'],
+    'DecisionGraphAdmin' => ['АдминистрированиеГрафа', 'Администрирование_графа', 'РедакторГрафа'],
 ];
