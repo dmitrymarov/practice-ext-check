@@ -287,7 +287,8 @@ async def search_ai(search_query: SearchQuery):
         logger.info(f"AI search query: {query}")
         logger.info(f"Context: {context}")
         logger.info(f"User ID: {user_id}")
-        
+        logger.info(f"Response Sources: {sources}")
+        logger.info(f"Response Length: {len(answer)}")
         if not query:
             return AISearchResponse(
                 answer="Пожалуйста, укажите поисковый запрос.",

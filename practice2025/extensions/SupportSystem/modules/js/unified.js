@@ -959,7 +959,7 @@
 
         api.post({
             action: 'supportticket',
-            operation: 'create',  // Используем правильное имя параметра
+            operation: 'create',
             subject: subject,
             description: description,
             priority: priority
@@ -967,7 +967,6 @@
             console.log('Ticket creation response:', data);
 
             if (data.ticket) {
-                // Если есть решение, прикрепить его к заявке
                 if (selectedSolution) {
                     attachSolution(data.ticket.id);
                 } else {
@@ -1075,6 +1074,400 @@
             return dateStr;
         }
     }
+
+    // Расширение $.ajax для обработки ошибок и повторных попыток
+    (function () {
+        'use strict';
+
+        // Сохраняем исходную функцию ajax
+        var originalAjax = $.ajax;
+
+        // Максимальное количество повторных попыток
+        var MAX_RETRIES = 3;
+
+        // Задержка между повторными попытками (в мс)
+        var RETRY_DELAY = 1000;
+
+        // Переопределяем $.ajax
+        $.ajax = function (url, options) {
+            // Нормализация аргументов
+            if (typeof url === 'object') {
+                options = url;
+                url = undefined;
+            }
+
+            options = options || {};
+
+            // Счетчик попыток
+            var retryCount = 0;
+
+            // Сохраняем исходные функции обратного вызова
+            var originalComplete = options.complete;
+            var originalSuccess = options.success;
+            var originalError = options.error;
+
+            // Создаем новую функцию complete
+            options.complete = function (jqXHR, textStatus) {
+                if (originalComplete) {
+                    originalComplete.apply(this, arguments);
+                }
+            };
+
+            // Создаем новую функцию успеха
+            options.success = function (data, textStatus, jqXHR) {
+                // Логирование успеха для отладки
+                console.log('Request successful:', options.url || url);
+
+                // Вызываем исходную функцию успеха
+                if (originalSuccess) {
+                    originalSuccess.apply(this, arguments);
+                }
+            };
+
+            // Создаем новую функцию обработки ошибок с повторными попытками
+            options.error = function (jqXHR, textStatus, errorThrown) {
+                var shouldRetry = retryCount < MAX_RETRIES &&
+                    (textStatus === 'timeout' ||
+                        textStatus === 'error' ||
+                        jqXHR.status >= 500);
+
+                console.warn('AJAX error: ' + textStatus + ' (Status: ' + jqXHR.status + ')',
+                    'URL: ' + (options.url || url),
+                    'Attempt: ' + (retryCount + 1) + ' of ' + (MAX_RETRIES + 1));
+
+                if (shouldRetry) {
+                    retryCount++;
+                    console.log('Retrying in ' + RETRY_DELAY + 'ms... (Attempt ' + retryCount + ' of ' + MAX_RETRIES + ')');
+
+                    // Показываем уведомление о повторной попытке, если есть mw.notify
+                    if (typeof mw !== 'undefined' && mw.notify) {
+                        mw.notify('Проблема с подключением. Повторная попытка ' + retryCount + ' из ' + MAX_RETRIES + '...', { type: 'warn' });
+                    }
+
+                    // Ждем некоторое время и повторяем запрос
+                    setTimeout(function () {
+                        originalAjax(url, options);
+                    }, RETRY_DELAY);
+
+                    return;
+                }
+
+                // Если исчерпаны все попытки или ошибка не требует повторной попытки
+                if (originalError) {
+                    originalError.apply(this, arguments);
+                }
+
+                // Показываем дружественное уведомление пользователю
+                if (typeof mw !== 'undefined' && mw.notify) {
+                    var friendlyMessage = getFriendlyErrorMessage(jqXHR, textStatus, errorThrown, options);
+                    mw.notify(friendlyMessage, { type: 'error' });
+                }
+            };
+
+            // Вызываем исходную функцию ajax
+            return originalAjax(url, options);
+        };
+
+        /**
+         * Получить дружественное сообщение об ошибке для пользователя
+         */
+        function getFriendlyErrorMessage(jqXHR, textStatus, errorThrown, options) {
+            // Определяем тип запроса для более точного сообщения
+            var requestType = getRequestTypeFromUrl(options.url);
+
+            // По статусу HTTP определяем тип ошибки
+            if (jqXHR.status === 0) {
+                return 'Не удалось подключиться к серверу. Проверьте интернет-соединение и попробуйте снова.';
+            } else if (jqXHR.status === 404) {
+                return 'Запрашиваемый ресурс не найден.';
+            } else if (jqXHR.status === 403) {
+                return 'Недостаточно прав для выполнения этой операции.';
+            } else if (jqXHR.status === 401) {
+                return 'Необходима авторизация. Пожалуйста, войдите в систему.';
+            } else if (jqXHR.status >= 500) {
+                return 'Внутренняя ошибка сервера при ' + getOperationName(requestType) + '. Попробуйте позже.';
+            } else if (textStatus === 'timeout') {
+                return 'Время ожидания ответа от сервера истекло. Попробуйте позже.';
+            } else if (textStatus === 'parsererror') {
+                return 'Ошибка при обработке данных от сервера.';
+            }
+
+            // Проверяем содержимое ответа на наличие сообщения об ошибке
+            try {
+                var responseData = jqXHR.responseJSON || JSON.parse(jqXHR.responseText);
+                if (responseData && responseData.error) {
+                    return 'Ошибка: ' + responseData.error.info || responseData.error.message || 'Неизвестная ошибка';
+                }
+            } catch (e) {
+                // Игнорируем ошибки при разборе ответа
+            }
+
+            // Если ничего конкретного не определили, возвращаем общее сообщение
+            return 'Произошла ошибка при ' + getOperationName(requestType) + '. Пожалуйста, попробуйте снова позже.';
+        }
+
+        /**
+         * Определить тип запроса по URL
+         */
+        function getRequestTypeFromUrl(url) {
+            if (!url) return 'unknown';
+
+            if (url.indexOf('supportticket') > -1) {
+                return 'ticket';
+            } else if (url.indexOf('supportnode') > -1) {
+                return 'graph';
+            } else if (url.indexOf('supportsearch') > -1) {
+                if (url.indexOf('use_ai=1') > -1) {
+                    return 'ai_search';
+                }
+                return 'search';
+            }
+
+            return 'unknown';
+        }
+
+        /**
+         * Получить название операции на понятном пользователю языке
+         */
+        function getOperationName(requestType) {
+            switch (requestType) {
+                case 'ticket':
+                    return 'работе с заявками';
+                case 'graph':
+                    return 'работе с диалоговым модулем';
+                case 'search':
+                    return 'поиске решений';
+                case 'ai_search':
+                    return 'использовании интеллектуального поиска';
+                default:
+                    return 'выполнении операции';
+            }
+        }
+
+    })();
+
+    /**
+     * Улучшения для функций поиска
+     */
+    (function () {
+        'use strict';
+
+        // Оригинальная функция searchAI
+        var originalSearchAI = window.searchAI;
+
+        // Переопределяем функцию searchAI
+        window.searchAI = function (query) {
+            // Показываем индикатор загрузки с расширенной информацией
+            $('#support-ai-loading').show();
+            $('#support-ai-content').hide();
+            $('#support-ai-container').show();
+            $('#support-solution-container').hide();
+
+            // Добавляем информацию о процессе
+            var loadingText = getMessage('supportsystem-dt-ai-loading', 'ИИ анализирует проблему...');
+            $('#support-ai-loading p').text(loadingText + ' Это может занять до 30 секунд.');
+
+            // Вызываем оригинальную функцию
+            return originalSearchAI.apply(this, arguments);
+        };
+
+        // Оригинальная функция searchSolutions
+        var originalSearchSolutions = window.searchSolutions;
+
+        // Переопределяем функцию searchSolutions
+        window.searchSolutions = function (query) {
+            // Запоминаем текущий запрос для возможного повтора
+            window._lastSearchQuery = query;
+
+            // Показываем расширенный индикатор загрузки
+            $('#support-search-results').html(
+                '<div class="support-loading">' +
+                '<div class="support-spinner"></div>' +
+                '<p>' + getMessage('supportsystem-search-loading', 'Поиск решений...') + '</p>' +
+                '<p class="support-loading-details">Идет поиск в базе знаний и MediaWiki...</p>' +
+                '</div>'
+            );
+
+            // Вызываем оригинальную функцию
+            return originalSearchSolutions.apply(this, arguments);
+        };
+
+        // Добавляем кнопку повтора поиска при ошибке
+        $(document).on('click', '.support-retry-search', function () {
+            if (window._lastSearchQuery) {
+                searchSolutions(window._lastSearchQuery);
+            }
+        });
+
+        // Улучшенная функция для отображения результатов поиска
+        window.displaySearchResults = function (results, query) {
+            var resultsHtml = '';
+
+            resultsHtml += '<h3>' + (mw.msg('supportsystem-search-results-count', results.length) || 'Найдено решений: ' + results.length) + '</h3>';
+
+            // Добавляем кнопку для повтора поиска
+            resultsHtml += '<p><button class="support-retry-search support-button-secondary">Повторить поиск</button></p>';
+
+            results.forEach(function (result) {
+                var source = result.source || 'unknown';
+                var sourceLabel = getSourceLabel(source);
+                var badgeClass = 'support-badge-' + source;
+
+                var content = result.content;
+
+                // Использовать highlight, если есть
+                if (result.highlight) {
+                    content = result.highlight.replace(/\n/g, '<br>');
+                } else {
+                    // Обрезать длинное содержимое
+                    var maxLength = 300;
+                    if (content && content.length > maxLength) {
+                        content = content.substring(0, maxLength) + '...';
+                    }
+                }
+
+                // Создать HTML для тегов, если есть
+                var tagsHtml = '';
+                if (result.tags && result.tags.length > 0) {
+                    tagsHtml = '<div class="support-result-tags"><strong>' +
+                        (mw.msg('supportsystem-search-tags') || 'Tags') + ':</strong> ';
+
+                    tagsHtml += result.tags.map(function (tag) {
+                        return '<span class="support-tag">' + tag + '</span>';
+                    }).join(' ');
+
+                    tagsHtml += '</div>';
+                }
+
+                // Создать карточку результата
+                resultsHtml +=
+                    '<div class="support-result-card">' +
+                    '<div class="support-result-header">' +
+                    '<h4>' + result.title + '</h4>' +
+                    '<div class="support-result-meta">' +
+                    '<span class="support-badge ' + badgeClass + '">' + sourceLabel + '</span>' +
+                    '<span class="support-score-badge">' +
+                    (mw.msg('supportsystem-search-relevance', Math.round(result.score * 10) / 10) || 'Relevance: ' + (Math.round(result.score * 10) / 10)) +
+                    '</span>' +
+                    '</div>' +
+                    '</div>' +
+                    '<div class="support-result-body">' +
+                    '<div class="support-result-content">' + content + '</div>' +
+                    tagsHtml +
+                    '<div class="support-result-actions">' +
+                    (result.url ? '<a href="' + result.url + '" target="_blank" class="support-source-link support-button-secondary">' +
+                        (mw.msg('supportsystem-search-source-link') || 'Go to source') + '</a>' : '') +
+                    '<button class="support-create-ticket-btn support-button-primary" data-solution="' +
+                    result.content.replace(/"/g, '&quot;') + '" data-source="' + source + '">' +
+                    (mw.msg('supportsystem-search-create-ticket') || 'Create ticket with this solution') + '</button>' +
+                    '</div>' +
+                    '</div>' +
+                    '</div>';
+            });
+
+            $('#support-search-results').html(resultsHtml);
+
+            // Добавить обработчик кнопки создания заявки
+            $('.support-create-ticket-btn').on('click', function () {
+                var solution = $(this).data('solution');
+                var source = $(this).data('source');
+                showTicketForm(solution, source);
+            });
+        };
+    })();
+
+    /**
+     * Улучшения для формы подачи тикета
+     */
+    (function () {
+        'use strict';
+
+        // Оригинальная функция submitTicket
+        var originalSubmitTicket = window.submitTicket;
+
+        // Переопределяем функцию submitTicket с добавлением обработки ошибок
+        window.submitTicket = function () {
+            var api = new mw.Api();
+
+            var subject = $('#support-ticket-subject').val();
+            var description = $('#support-ticket-description').val();
+            var priority = $('#support-ticket-priority').val();
+
+            // Добавляем логирование для отладки
+            console.log('Submitting ticket:', {
+                subject: subject,
+                description: description.substring(0, 50) + '...', // Логируем только начало описания
+                priority: priority
+            });
+
+            if (!subject) {
+                mw.notify(getMessage('supportsystem-sd-ticket-subject-required', 'Ticket subject is required'), { type: 'error' });
+                $('#support-ticket-subject').focus();
+                return;
+            }
+
+            if (!description) {
+                mw.notify(getMessage('supportsystem-sd-ticket-description-required', 'Problem description is required'), { type: 'error' });
+                $('#support-ticket-description').focus();
+                return;
+            }
+
+            $('#support-ticket-submit').prop('disabled', true);
+            $('#support-ticket-submit').text(getMessage('supportsystem-dt-submitting', 'Submitting...'));
+
+            // Показываем уведомление о начале процесса
+            mw.notify('Создание заявки... Пожалуйста, подождите.', { type: 'info' });
+
+            api.post({
+                action: 'supportticket',
+                operation: 'create',
+                subject: subject,
+                description: description,
+                priority: priority
+            }).done(function (data) {
+                console.log('Ticket creation response:', data);
+
+                if (data.ticket) {
+                    // Если есть решение, прикрепить его к заявке
+                    if (selectedSolution) {
+                        attachSolution(data.ticket.id);
+                    } else {
+                        showTicketSuccess(data.ticket.id);
+                    }
+                } else {
+                    mw.notify(getMessage('supportsystem-search-ticket-error', 'Error creating ticket'), { type: 'error' });
+                    $('#support-ticket-submit').prop('disabled', false);
+                    $('#support-ticket-submit').text(getMessage('supportsystem-dt-submit', 'Submit'));
+                }
+            }).fail(function (error, textStatus, errorThrown) {
+                console.error('Error creating ticket:', error, textStatus, errorThrown);
+
+                // Более информативное сообщение об ошибке
+                var errorMsg = getMessage('supportsystem-search-ticket-error', 'Error creating ticket');
+
+                if (error && error.error && error.error.info) {
+                    errorMsg += ': ' + error.error.info;
+                } else if (errorThrown) {
+                    errorMsg += ': ' + errorThrown;
+                }
+
+                mw.notify(errorMsg, { type: 'error' });
+
+                $('#support-ticket-submit').prop('disabled', false);
+                $('#support-ticket-submit').text(getMessage('supportsystem-dt-submit', 'Submit'));
+
+                // Добавляем кнопку повторной попытки
+                $('#support-ticket-form .support-form-actions').prepend(
+                    '<button type="button" id="support-ticket-retry" class="support-button-secondary">Повторить попытку</button>'
+                );
+
+                $('#support-ticket-retry').on('click', function () {
+                    $(this).remove();
+                    submitTicket();
+                });
+            });
+        };
+    })();
 
     // Инициализация при загрузке DOM
     $(init);

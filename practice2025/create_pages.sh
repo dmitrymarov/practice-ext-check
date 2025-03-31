@@ -65,6 +65,7 @@ fi
 # Create pages
 for i in {1..5}; do
   TITLE="API Test Page $i"
+  CONTENT="= API Test Page $i =
 
 This page was created automatically via the MediaWiki API.
 

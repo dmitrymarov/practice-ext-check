@@ -38,7 +38,7 @@ $wgResourceBasePath = $wgScriptPath;
 ## or else you'll overwrite your logo when you upgrade!
 $wgLogos = [
     '1x' => "$wgResourceBasePath/resources/assets/change-your-logo.svg",
-    'icon' => "$wgResourceBasePath/resources/assets/change-your-logo-icon.svg",
+    'icon' => "$wgResourceBasePath/resources/assets/change-your-logo.svg",
 ];
 
 ## UPO means: this is also a user preference option
@@ -71,7 +71,7 @@ $wgDBTableOptions = "ENGINE=InnoDB, DEFAULT CHARSET=binary";
 $wgSharedTables[] = "actor";
 
 ## Shared memory settings
-$wgMainCacheType = CACHE_NONE;
+$wgMainCacheType = CACHE_ACCEL;
 $wgMemCachedServers = [];
 
 ## To enable image uploads, make sure the 'images' directory
@@ -99,14 +99,14 @@ $wgLocaltimezone = "UTC";
 ## be publicly accessible from the web.
 #$wgCacheDirectory = "$IP/cache";
 
-$wgSecretKey = "62d763fc94a7f250d78fd896129eae3eb74a27800888c92c0071d4f640a45d19";
+$wgSecretKey = "3b3404e62984d1f87ac1ec2562e309ddf2410b1b92405570a320a822ed5f3ac0";
 
 # Changing this will log out all existing sessions.
 $wgAuthenticationTokenVersion = "1";
 
 # Site upgrade key. Must be set to a string (default provided) to turn on the
 # web installer while LocalSettings.php is in place
-$wgUpgradeKey = "9f51d00c08162163";
+$wgUpgradeKey = "268cae80c62cbc48";
 
 ## For attaching licensing metadata to pages, and displaying an
 ## appropriate copyright notice / icon. GNU Free Documentation
@@ -126,19 +126,13 @@ $wgDefaultSkin = "vector";
 $wgSupportSystemOpenSearchHost = 'opensearch-node1';
 $wgSupportSystemOpenSearchPort = 9200;
 $wgSupportSystemOpenSearchIndex = 'solutions';
-$wgSupportSystemRedmineURL = 'http://172.29.46.60:3000';
+$wgSupportSystemRedmineURL = 'http://redmine:3000';
 $wgSupportSystemRedmineAPIKey = 'c177337d75a1da3bb43d67ec9b9bb139b299502f';
-$wgSupportSystemAIServiceURL = 'http://172.29.46.60:5000';
+$wgSupportSystemAIServiceURL = 'http://ai-service:5000';
 $wgSupportSystemUseMock = false;
 $wgSupportSystemGraphDataFile = '/var/www/html/extensions/SupportSystem/data/graph_data.json';
 
-# Enable debugging
-$wgDebugLogFile = "/var/log/mediawiki/debug-{$wgDBname}.log";
-$wgDebugToolbar = true;
-$wgShowExceptionDetails = true;
-
 $wgSearchType = 'CirrusSearch';
-$wgCirrusSearchUpdateShardTimeout = '5m';
 $wgCirrusSearchClientSideSearchTimeout = [
     'default' => 60, 
 ];
@@ -149,38 +143,6 @@ $wgCirrusSearchServers = [
         'port' => 9200
     ]
 ];
-$wgCirrusSearchUseElasticaconfig = false;
-$wgCirrusSearchElasticQuirks = true;
-$wgCirrusSearchUseElastica = true;
-$wgCirrusSearchUseIcuFolding = true;
-$wgCirrusSearchUseIcuTokenizer = true;
-$wgCirrusSearchElasticaClientConfig = [
-    'connections' => [
-        [
-            'host' => 'opensearch-node1',
-            'port' => 9200,
-            'transport' => 'Http',
-            'path' => '',
-            'url' => 'http://opensearch-node1:9200'
-        ]
-    ],
-    'curl' => [
-        'curlOpts' => [
-            CURLOPT_HTTPHEADER => ['Content-Type: application/json']
-        ]
-    ]
-];
-
-$wgCirrusSearchUseElastic7 = false;
-
-$wgCirrusSearchUseOpenSearch = true;
-$wgCirrusSearchOpenSearchVersion = '2.x';
-
-$wgCirrusSearchAllowElasticaToHandleOptimisticConcurrency = false;
-
-$wgCirrusSearchSslVerification = false;
-$wgCirrusSearchUseSSL = false;
-$wgCirrusSearchVerifySSL = false;
 
 # Enabled skins.
 # The following skins were automatically enabled:
@@ -198,7 +160,3 @@ wfLoadExtension('SupportSystem');
 wfLoadExtension('Elastica');
 wfLoadExtension('CirrusSearch');
 wfLoadExtension('SyntaxHighlight_GeSHi');
-
-
-$wgDebugLogGroups['SupportSystem'] = '/var/log/mediawiki/support-system.log';
-$wgDebugLogGroups['http'] = '/var/log/mediawiki/http.log';
