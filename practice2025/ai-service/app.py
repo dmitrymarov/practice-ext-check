@@ -10,14 +10,12 @@ import uuid
 import json
 import requests
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-# Initialize FastAPI app
 app = FastAPI(
     title="Support System AI Service",
     description="AI service for MediaWiki Support System extension",
@@ -50,15 +48,12 @@ class AISearchResponse(BaseModel):
     sources: List[Source] = Field(default_factory=list)
     success: bool
 
-# Environment variables
 MEDIAWIKI_URL = os.environ.get('MEDIAWIKI_URL', 'http://mediawiki/api.php')
 REDMINE_URL = os.environ.get('REDMINE_URL', 'http://redmine:3000')
 STORAGE_PATH = os.environ.get('STORAGE_PATH', '/app/data')
 
-# Ensure storage directory exists
 os.makedirs(STORAGE_PATH, exist_ok=True)
 
-# Middleware for request tracking
 @app.middleware("http")
 async def add_request_id(request: Request, call_next):
     request_id = str(uuid.uuid4())
@@ -73,7 +68,6 @@ async def add_request_id(request: Request, call_next):
     
     return response
 
-# Global exception handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled exception: {str(exc)}", exc_info=True)
@@ -82,12 +76,10 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": "An internal server error occurred"}
     )
 
-# Health check endpoint
 @app.get("/", tags=["Health"])
 async def health_check():
     return {"status": "ok", "message": "AI service is running"}
 
-# Query history manager
 class QueryHistoryManager:
     def __init__(self):
         self.history_file = os.path.join(STORAGE_PATH, "query_history.json")
@@ -134,44 +126,33 @@ class QueryHistoryManager:
     def get_user_history(self, user_id):
         if not user_id:
             return []
-        
         return self.history.get(user_id, [])
     
     def update_user_history(self, user_id, query, response):
         if not user_id:
             return
-        
         if user_id not in self.history:
             self.history[user_id] = []
-        
-        # Add the query to history
         history_entry = {
             "query": query,
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
             "answer": response.get("answer", ""),
             "sources": response.get("sources", [])
         }
-        
-        # Keep only last 20 queries in history
         self.history[user_id] = [history_entry] + self.history[user_id][:19]
         
         self.save_history()
     
     def update_frequent_queries(self, query, response):
-        # Normalize query
         normalized_query = " ".join(query.lower().split())
-        
         if normalized_query not in self.frequent_queries:
             self.frequent_queries[normalized_query] = {
                 "count": 0,
                 "last_response": None,
                 "sources": []
             }
-        
         self.frequent_queries[normalized_query]["count"] += 1
         self.frequent_queries[normalized_query]["last_response"] = response.get("answer", "")
-        
-        # Update sources if present
         if "sources" in response and response["sources"]:
             self.frequent_queries[normalized_query]["sources"] = response["sources"]
         
@@ -179,25 +160,17 @@ class QueryHistoryManager:
     
     def find_similar_query(self, query):
         normalized_query = " ".join(query.lower().split())
-        
-        # Exact match
         if normalized_query in self.frequent_queries:
             return self.frequent_queries[normalized_query]
-        
-        # Check for queries containing this one
         for q, data in self.frequent_queries.items():
             if normalized_query in q or q in normalized_query:
                 return data
-        
-        # Check for word-level matches
         query_words = set(normalized_query.split())
         best_match = None
         best_match_score = 0
-        
         for q, data in self.frequent_queries.items():
             q_words = set(q.split())
             common_words = query_words.intersection(q_words)
-            
             if common_words:
                 score = len(common_words) / max(len(query_words), len(q_words))
                 if score > 0.6 and score > best_match_score:
@@ -206,7 +179,6 @@ class QueryHistoryManager:
         
         return best_match
 
-# MediaWiki client
 class MediaWikiClient:
     def __init__(self, api_url):
         self.api_url = api_url
@@ -229,12 +201,10 @@ class MediaWikiClient:
             if response.status_code != 200:
                 logger.error(f"Error searching MediaWiki: {response.status_code} {response.text}")
                 return []
-            
             data = response.json()
-            
             if 'query' not in data or 'search' not in data['query']:
                 return []
-            
+
             results = []
             for page in data['query']['search']:
                 page_url = f"{self.api_url.split('/api.php')[0]}/index.php?title={page['title'].replace(' ', '_')}"
@@ -295,11 +265,9 @@ class MediaWikiClient:
         import re
         return re.sub('<.*?>', ' ', html).strip()
 
-# Initialize components
 history_manager = QueryHistoryManager()
 mediawiki_client = MediaWikiClient(MEDIAWIKI_URL)
 
-# AI-powered search endpoint
 @app.post("/api/search_ai", response_model=AISearchResponse, tags=["Search"])
 async def search_ai(search_query: SearchQuery):
     """
@@ -326,8 +294,6 @@ async def search_ai(search_query: SearchQuery):
                 sources=[],
                 success=False
             )
-        
-        # Check user history for similar queries
         similar_query = None
         if user_id:
             user_history = history_manager.get_user_history(user_id)
@@ -336,25 +302,17 @@ async def search_ai(search_query: SearchQuery):
                     similar_query = entry
                     logger.info(f"Found exact match in user history: {entry['query']}")
                     break
-        
-        # Check frequent queries if no match in user history
         if not similar_query:
             similar_query = history_manager.find_similar_query(query)
             if similar_query:
                 logger.info(f"Found similar query in global history, count: {similar_query['count']}")
-        
-        # If we have a good match with sufficient confidence, return its response
         if similar_query and (isinstance(similar_query, dict) and similar_query.get("count", 0) > 2 or 
                              similar_query.get("answer")):
-            
             answer = similar_query.get("answer", "")
             if not answer:
                 answer = similar_query.get("last_response", "")
-            
             sources_data = similar_query.get("sources", [])
             sources = []
-            
-            # Convert sources to the expected format
             for source_data in sources_data:
                 source = Source(
                     title=source_data.get("title", "Unknown"),
@@ -364,31 +322,24 @@ async def search_ai(search_query: SearchQuery):
                 if "url" in source_data:
                     source.url = source_data["url"]
                 sources.append(source)
-            
-            # Update user history
             if user_id:
                 history_manager.update_user_history(user_id, query, {
                     "answer": answer,
                     "sources": sources_data
                 })
-            
             return AISearchResponse(
                 answer=answer,
                 sources=sources,
                 success=True
             )
-        
-        # Search for relevant pages in MediaWiki
         mediawiki_results = mediawiki_client.search_pages(query)
-        
         if not mediawiki_results:
             error_response = AISearchResponse(
-                answer="К сожалению, не удалось найти подходящие материалы. Попробуйте переформулировать запрос или создать заявку для получения помощи.",
+                answer="К сожалению, не удалось найти подходящие материалы. \
+                    Попробуйте переформулировать запрос или создать заявку для получения помощи.",
                 sources=[],
                 success=False
             )
-            
-            # Still update history for unsuccessful queries
             if user_id:
                 history_manager.update_user_history(user_id, query, {
                     "answer": error_response.answer,
@@ -396,26 +347,17 @@ async def search_ai(search_query: SearchQuery):
                 })
             
             return error_response
-        
-        # Get most relevant result
         top_result = mediawiki_results[0]
-        
-        # Get full page content if needed
         content = top_result.get("content", "")
-        if len(content) < 100:  # If content is too short, get full content
+        if len(content) < 2000:
             full_content = mediawiki_client.get_page_content(top_result["id"])
             if full_content:
                 content = full_content
-                # Limit to a reasonable size
                 if len(content) > 1000:
                     content = content[:1000] + "..."
-        
-        # Generate an answer based on the page content
         answer = f"Вот информация по вашему запросу '{query}':\n\n{content}\n\nПодробнее вы можете прочитать на странице \"{top_result['title']}\"."
-        
-        # Format sources for response
         sources = []
-        for result in mediawiki_results[:3]:  # Top 3 sources
+        for result in mediawiki_results[:3]:
             source = Source(
                 title=result["title"],
                 id=result["id"],
@@ -423,14 +365,11 @@ async def search_ai(search_query: SearchQuery):
                 url=result.get("url")
             )
             sources.append(source)
-        
-        # Prepare response data for history
         response_data = {
             "answer": answer,
             "sources": [s.dict() for s in sources]
         }
         
-        # Update history and frequent queries
         if user_id:
             history_manager.update_user_history(user_id, query, response_data)
         history_manager.update_frequent_queries(query, response_data)

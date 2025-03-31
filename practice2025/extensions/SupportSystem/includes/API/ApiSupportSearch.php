@@ -1,5 +1,4 @@
 <?php
-
 namespace MediaWiki\Extension\SupportSystem\API;
 
 use ApiBase;
@@ -25,58 +24,27 @@ class ApiSupportSearch extends ApiBase
             $context = $params['context'] ? json_decode($params['context'], true) : [];
 
             $searchModule = new SearchModule();
-            $results = [];
+            $searchMethods = [];
+
+            // Определяем методы поиска на основе параметров
+            if (in_array('opensearch', $sources)) {
+                $searchMethods[] = 'opensearch';
+            }
+
+            if (in_array('mediawiki', $sources)) {
+                $searchMethods[] = 'cirrus';
+            }
+
+            if ($useAi) {
+                $searchMethods[] = 'ai';
+            }
 
             // Подробное логирование для отладки
-            wfDebugLog('SupportSystem', "API Search request: Query=$query, Sources=" . implode(',', $sources) . ", UseAI=" . ($useAi ? 'true' : 'false'));
+            wfDebugLog('SupportSystem', "API Search request: Query=$query, Methods=" . implode(',', $searchMethods));
 
-            // Regular search
-            if (!$useAi) {
-                // Search in OpenSearch if enabled
-                if (in_array('opensearch', $sources)) {
-                    try {
-                        $opensearchResults = $searchModule->search($query);
-                        $results = array_merge($results, $opensearchResults);
-                        wfDebugLog('SupportSystem', "OpenSearch returned " . count($opensearchResults) . " results");
-                    } catch (Exception $e) {
-                        wfDebugLog('SupportSystem', "OpenSearch error: " . $e->getMessage());
-                        // Продолжаем выполнение даже при ошибке OpenSearch
-                    }
-                }
-
-                // Search in MediaWiki if enabled
-                if (in_array('mediawiki', $sources)) {
-                    try {
-                        $mediawikiResults = $searchModule->searchMediaWiki($query);
-                        $results = array_merge($results, $mediawikiResults);
-                        wfDebugLog('SupportSystem', "MediaWiki search returned " . count($mediawikiResults) . " results");
-                    } catch (Exception $e) {
-                        wfDebugLog('SupportSystem', "MediaWiki search error: " . $e->getMessage());
-                        // Продолжаем выполнение даже при ошибке поиска MediaWiki
-                    }
-                }
-
-                // Sort by score
-                usort($results, function ($a, $b) {
-                    return $b['score'] <=> $a['score'];
-                });
-
-                $this->getResult()->addValue(null, 'results', $results);
-                // Добавляем информацию для отладки
-                $this->getResult()->addValue(null, 'debuginfo', [
-                    'query' => $query,
-                    'sources' => $sources,
-                    'resultCount' => count($results),
-                    'mwVersion' => MW_VERSION,
-                    'phpEngine' => 'PHP',
-                    'phpVersion' => PHP_VERSION,
-                    'time' => microtime(true) - $_SERVER['REQUEST_TIME_FLOAT'],
-                    'log' => ['Search completed successfully']
-                ]);
-            } else {
-                // AI search
-                // Get user ID for tracking context
-                $userId = null;
+            // Get user ID for tracking context if using AI
+            $userId = null;
+            if ($useAi) {
                 $user = $this->getUser();
                 if ($user && !$user->isAnon()) {
                     $userId = 'user_' . $user->getId();
@@ -87,43 +55,35 @@ class ApiSupportSearch extends ApiBase
                         $userId = 'anon_' . $session->getId();
                     }
                 }
+            }
 
-                try {
-                    $aiResult = $searchModule->searchAI($query, $context, $userId);
-                    $this->getResult()->addValue(null, 'ai_result', $aiResult);
+            // Выполняем комплексный поиск
+            $searchResult = $searchModule->comprehensiveSearch($query, $searchMethods, $context, $userId);
 
-                    // Добавляем информацию для отладки
-                    $this->getResult()->addValue(null, 'debuginfo', [
-                        'query' => $query,
-                        'context' => $context,
-                        'userId' => $userId,
-                        'mwVersion' => MW_VERSION,
-                        'phpEngine' => 'PHP',
-                        'phpVersion' => PHP_VERSION,
-                        'time' => microtime(true) - $_SERVER['REQUEST_TIME_FLOAT'],
-                        'log' => ['AI search completed successfully']
-                    ]);
-                } catch (Exception $e) {
-                    wfDebugLog('SupportSystem', "AI search error: " . $e->getMessage());
+            // Добавляем результаты поиска в ответ API
+            $this->getResult()->addValue(null, 'results', $searchResult['results']);
 
-                    // Возвращаем объект ошибки вместо выбрасывания исключения
-                    $this->getResult()->addValue(null, 'ai_result', [
-                        'answer' => 'К сожалению, произошла ошибка при выполнении поиска. Пожалуйста, попробуйте позже.',
-                        'sources' => [],
-                        'success' => false
-                    ]);
-
-                    // Добавляем информацию для отладки
-                    $this->getResult()->addValue(null, 'debuginfo', [
-                        'error' => $e->getMessage(),
-                        'mwVersion' => MW_VERSION,
-                        'phpEngine' => 'PHP',
-                        'phpVersion' => PHP_VERSION,
-                        'time' => microtime(true) - $_SERVER['REQUEST_TIME_FLOAT'],
-                        'log' => ['AI search encountered an error']
-                    ]);
+            // Если был запрошен AI поиск и есть AI результат
+            if ($useAi) {
+                // Ищем AI-результат среди результатов поиска
+                foreach ($searchResult['results'] as $result) {
+                    if ($result['source'] === 'ai' && isset($result['ai_result'])) {
+                        $this->getResult()->addValue(null, 'ai_result', $result['ai_result']);
+                        break;
+                    }
                 }
             }
+
+            // Добавляем отладочную информацию
+            $this->getResult()->addValue(null, 'debuginfo', [
+                'query' => $query,
+                'searchMethods' => $searchMethods,
+                'resultCount' => count($searchResult['results']),
+                'searchTime' => $searchResult['debug']['totalTime'],
+                'mwVersion' => MW_VERSION,
+                'phpVersion' => PHP_VERSION
+            ]);
+
         } catch (Exception $e) {
             wfDebugLog('SupportSystem', "API Search exception: " . $e->getMessage() . "\n" . $e->getTraceAsString());
 
@@ -134,9 +94,9 @@ class ApiSupportSearch extends ApiBase
             ]);
 
             // Добавляем пустые результаты для совместимости
-            if (!$useAi) {
-                $this->getResult()->addValue(null, 'results', []);
-            } else {
+            $this->getResult()->addValue(null, 'results', []);
+
+            if ($useAi) {
                 $this->getResult()->addValue(null, 'ai_result', [
                     'answer' => 'К сожалению, произошла ошибка при выполнении поиска. Пожалуйста, попробуйте позже.',
                     'sources' => [],
@@ -148,10 +108,7 @@ class ApiSupportSearch extends ApiBase
             $this->getResult()->addValue(null, 'debuginfo', [
                 'error' => $e->getMessage(),
                 'mwVersion' => MW_VERSION,
-                'phpEngine' => 'PHP',
-                'phpVersion' => PHP_VERSION,
-                'time' => microtime(true) - $_SERVER['REQUEST_TIME_FLOAT'],
-                'log' => ['API Search encountered an error']
+                'phpVersion' => PHP_VERSION
             ]);
         }
     }

@@ -126,9 +126,9 @@ $wgDefaultSkin = "vector";
 $wgSupportSystemOpenSearchHost = 'opensearch-node1';
 $wgSupportSystemOpenSearchPort = 9200;
 $wgSupportSystemOpenSearchIndex = 'solutions';
-$wgSupportSystemRedmineURL = 'http://redmine:3000';
+$wgSupportSystemRedmineURL = 'http://172.29.46.60:3000';
 $wgSupportSystemRedmineAPIKey = 'c177337d75a1da3bb43d67ec9b9bb139b299502f';
-$wgSupportSystemAIServiceURL = 'http://ai-service:5000';
+$wgSupportSystemAIServiceURL = 'http://172.29.46.60:5000';
 $wgSupportSystemUseMock = false;
 $wgSupportSystemGraphDataFile = '/var/www/html/extensions/SupportSystem/data/graph_data.json';
 

@@ -1,5 +1,4 @@
 <?php
-
 namespace MediaWiki\Extension\SupportSystem;
 
 use MediaWiki\MediaWikiServices;
@@ -45,21 +44,9 @@ class ServiceDesk
         $testUrl = rtrim($this->apiUrl, '/');
         wfDebugLog('SupportSystem', "Testing connection to Redmine URL: $testUrl");
 
-        $testResponse = Http::request($testUrl, [
-            'method' => 'GET',
-            'timeout' => 10,
-            'followRedirects' => true,
-            'sslVerifyCert' => false,
-            'proxy' => false,
-            'noProxy' => true,
-            'curlOptions' => [
-                CURLOPT_FAILONERROR => false, // Don't fail on 4xx errors
-                CURLOPT_CONNECTTIMEOUT => 5   // Connect timeout
-            ]
-        ]);
-
-        if ($testResponse === false) {
-            wfDebugLog('SupportSystem', "Redmine connectivity test failed. Redmine might be unreachable.");
+        // Тестируем соединение с Redmine перед созданием тикета
+        $testResponse = $this->testRedmineConnection();
+        if (!$testResponse['success']) {
             throw new MWException('Redmine service is unreachable. Please check connection settings.');
         }
 
@@ -84,8 +71,7 @@ class ServiceDesk
 
         $url = rtrim($this->apiUrl, '/') . "/issues.json";
         wfDebugLog('SupportSystem', "Redmine API URL for ticket creation: $url");
-
-        // Делаем запрос с более детальными настройками curl
+         // Делаем запрос с более детальными настройками curl
         $options = [
             'method' => 'POST',
             'timeout' => 30,
@@ -150,6 +136,59 @@ class ServiceDesk
     }
 
     /**
+     * Test connection to Redmine server
+     * @return array Success status and message
+     */
+    private function testRedmineConnection(): array
+    {
+        try {
+            $testUrl = rtrim($this->apiUrl, '/');
+
+            $options = [
+                'method' => 'GET',
+                'timeout' => 5,
+                'headers' => [
+                    'X-Redmine-API-Key' => $this->apiKey
+                ],
+                'followRedirects' => true,
+                'sslVerifyCert' => false,
+                'proxy' => false,
+                'noProxy' => true,
+                'curlOptions' => [
+                    CURLOPT_CONNECTTIMEOUT => 3,
+                    CURLOPT_SSL_VERIFYPEER => false,
+                    CURLOPT_SSL_VERIFYHOST => false
+                ]
+            ];
+
+            // Пробуем получить простой ответ от Redmine
+            wfDebugLog('SupportSystem', "Testing connection to Redmine: $testUrl");
+            $response = Http::request($testUrl, $options);
+
+            if ($response === false) {
+                wfDebugLog('SupportSystem', "Redmine connection test failed: No response");
+                return [
+                    'success' => false,
+                    'message' => 'No response from Redmine server'
+                ];
+            }
+
+            // Если получили какой-то ответ, считаем соединение успешным
+            wfDebugLog('SupportSystem', "Redmine connection test succeeded");
+            return [
+                'success' => true,
+                'message' => 'Connection successful'
+            ];
+        } catch (\Exception $e) {
+            wfDebugLog('SupportSystem', "Redmine connection test exception: " . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => $e->getMessage()
+            ];
+        }
+    }
+
+    /**
      * Get priority ID from name
      * @param string $priorityName Priority name
      * @return int Priority ID
@@ -165,7 +204,7 @@ class ServiceDesk
 
         return $priorities[strtolower($priorityName)] ?? 2;
     }
-    
+
     /**
      * Get a ticket by ID
      * @param int $ticketId Ticket ID
@@ -182,7 +221,11 @@ class ServiceDesk
             ],
             'followRedirects' => true,
             'sslVerifyCert' => false,
-            'proxy' => false
+            'proxy' => false,
+            'curlOptions' => [
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => false
+            ]
         ];
 
         wfDebugLog('SupportSystem', "Getting ticket #$ticketId from Redmine");
@@ -201,7 +244,7 @@ class ServiceDesk
 
         return $data['issue'];
     }
-    
+
     /**
      * Add a comment to a ticket
      * @param int $ticketId Ticket ID
@@ -210,6 +253,13 @@ class ServiceDesk
      */
     public function addComment(int $ticketId, string $comment): bool
     {
+        // Проверяем соединение перед добавлением комментария
+        $connectionTest = $this->testRedmineConnection();
+        if (!$connectionTest['success']) {
+            wfDebugLog('SupportSystem', "Cannot add comment: Redmine connection test failed");
+            return false;
+        }
+
         $issueData = [
             'issue' => [
                 'notes' => $comment
@@ -228,7 +278,11 @@ class ServiceDesk
             ],
             'followRedirects' => true,
             'sslVerifyCert' => false,
-            'proxy' => false
+            'proxy' => false,
+            'curlOptions' => [
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => false
+            ]
         ];
 
         wfDebugLog('SupportSystem', "Adding comment to ticket #$ticketId");
@@ -242,12 +296,20 @@ class ServiceDesk
         // Для Redmine успешное обновление возвращает 204 No Content (пустой ответ)
         return true;
     }
+
     /**
      * Get all tickets
      * @return array The tickets
      */
     public function getAllTickets(): array
     {
+        // Проверяем соединение перед запросом тикетов
+        $connectionTest = $this->testRedmineConnection();
+        if (!$connectionTest['success']) {
+            wfDebugLog('SupportSystem', "Cannot get tickets: Redmine connection test failed");
+            return [];
+        }
+
         $url = rtrim($this->apiUrl, '/') . "/issues.json";
         $options = [
             'method' => 'GET',
@@ -257,7 +319,11 @@ class ServiceDesk
             ],
             'followRedirects' => true,
             'sslVerifyCert' => false,
-            'proxy' => false
+            'proxy' => false,
+            'curlOptions' => [
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => false
+            ]
         ];
 
         wfDebugLog('SupportSystem', "Getting all tickets from Redmine");
@@ -276,7 +342,6 @@ class ServiceDesk
 
         return $data['issues'];
     }
-
 
     /**
      * Attach a solution to a ticket

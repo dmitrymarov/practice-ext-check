@@ -439,9 +439,9 @@
     }
 
     /**
-     * Search for solutions
-     * @param {string} query
-     */
+    * Search for solutions
+    * @param {string} query
+    */
     function searchSolutions(query) {
         var api = new mw.Api();
         var useAI = $('#support-search-use-ai').is(':checked');
@@ -454,20 +454,17 @@
             '</div>'
         );
 
-        var apiParams = {
+        console.log('Search params:', {
+            query: query,
+            useAI: useAI
+        });
+
+        api.get({
             action: 'supportsearch',
-            query: query
-        };
-
-        if (useAI) {
-            apiParams.use_ai = 1;
-        } else {
-            apiParams.sources = 'opensearch|mediawiki';
-        }
-
-        console.log('Search params:', apiParams);
-
-        api.get(apiParams).done(function (data) {
+            query: query,
+            sources: 'opensearch|mediawiki',
+            use_ai: useAI
+        }).done(function (data) {
             console.log('Search response:', data);
 
             if (useAI && data.ai_result) {
@@ -478,8 +475,18 @@
                 $('#support-search-results').html(
                     '<div class="support-no-results">' +
                     '<p>' + getMessage('supportsystem-search-noresults', 'No results found. Try changing your query.') + '</p>' +
-                    '</div>'
+                    '</div>' +
+                    (useAI ? '' : '<div class="support-try-ai">' +
+                        '<button id="support-search-ai-button" class="support-button-primary">' +
+                        getMessage('supportsystem-search-try-ai', 'Try AI-powered search') + '</button>' +
+                        '</div>')
                 );
+
+                // Добавляем обработчик для кнопки AI поиска
+                $('#support-search-ai-button').on('click', function () {
+                    $('#support-search-use-ai').prop('checked', true);
+                    searchSolutions(query);
+                });
             }
         }).fail(function (error) {
             console.error('Search error:', error);

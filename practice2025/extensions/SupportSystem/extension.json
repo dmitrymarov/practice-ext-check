@@ -44,7 +44,7 @@
     "ResourceModules": {
         "ext.supportSystem.styles": {
             "styles": [
-                "modules/css/supportSystem.css"
+                "modules/css/unified.css"
             ]
         },
         "ext.supportSystem.unified": {
@@ -154,13 +154,13 @@
             "value": "solutions"
         },
         "SupportSystemRedmineURL": {
-            "value": "http://redmine:3000"
+            "value": "http://172.29.46.60:3000"
         },
         "SupportSystemRedmineAPIKey": {
             "value": "c177337d75a1da3bb43d67ec9b9bb139b299502f"
         },
         "SupportSystemAIServiceURL": {
-            "value": "http://ai-service:5000"
+            "value": "http://172.29.46.60:5000"
         },
         "SupportSystemUseMock": {
             "value": false
