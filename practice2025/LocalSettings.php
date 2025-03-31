@@ -126,23 +126,40 @@ $wgDefaultSkin = "vector";
 $wgSupportSystemOpenSearchHost = 'opensearch-node1';
 $wgSupportSystemOpenSearchPort = 9200;
 $wgSupportSystemOpenSearchIndex = 'solutions';
-$wgSupportSystemRedmineURL = 'http://redmine:3000';
 $wgSupportSystemRedmineAPIKey = 'c177337d75a1da3bb43d67ec9b9bb139b299502f';
-$wgSupportSystemAIServiceURL = 'http://ai-service:5000';
+$wgSupportSystemRedmineURL = getenv('REDMINE_URL') ?: 'http://redmine:3000';
+$wgSupportSystemAIServiceURL = getenv('AI_SERVICE_URL') ?: 'http://ai-service:5000';
 $wgSupportSystemUseMock = false;
 $wgSupportSystemGraphDataFile = '/var/www/html/extensions/SupportSystem/data/graph_data.json';
 
-$wgSearchType = 'CirrusSearch';
-$wgCirrusSearchClientSideSearchTimeout = [
-    'default' => 60, 
-];
+
 $wgCirrusSearchIndexBaseName = 'mediawiki';
+$wgCirrusSearchUseElasticaSerializer = 5;
+$wgCirrusSearchClientSideSearchTimeout = [
+    'default' => 60,
+];
+$wgSearchType = 'CirrusSearch';
 $wgCirrusSearchServers = [
     [
         'host' => 'opensearch-node1',
-        'port' => 9200
+        'port' => 9200,
+        'transport' => 'Http',
+        'path' => '',
+        'schema' => 'http'
     ]
 ];
+
+// Отключение SSL для OpenSearch
+$wgCirrusSearchUseSSL = false;
+$wgCirrusSearchUseOpenSearch = true;
+// Включение патчей для совместимости с OpenSearch
+// require_once "$IP/extensions/Elastica/opensearch-patch.php";
+// require_once "$IP/extensions/CirrusSearch/opensearch-patch.php";
+$wgHooks['CirrusSearchAlterQueryBuilder'][] = 'MediaWiki\Extension\SupportSystem\CirrusSearchAIHook::onCirrusSearchAlterQueryBuilder';
+$wgHooks['CirrusSearchResults'][] = 'MediaWiki\Extension\SupportSystem\CirrusSearchAIHook::onCirrusSearchResults';
+$wgAPIModules['unifiedsearch'] = 'MediaWiki\Extension\SupportSystem\API\ApiUnifiedSearch';
+$wgSupportSystemAIServiceURL = 'http://ai-service:5000';
+
 
 # Enabled skins.
 # The following skins were automatically enabled:

@@ -335,11 +335,12 @@
             context: context
         });
 
+        // Используем новый API-мост для обращения к AI-сервису
         api.get({
-            action: 'supportsearch',
+            action: 'aibridge',
             query: searchState.searchQuery,
-            use_ai: 1,
-            context: JSON.stringify(context)
+            context: JSON.stringify(context),
+            format: 'json'
         }).done(function (data) {
             console.log('AI search response:', data);
 
@@ -459,18 +460,36 @@
             useAI: useAI
         });
 
+        // Используем новый унифицированный API
         api.get({
-            action: 'supportsearch',
+            action: 'unifiedsearch',
             query: query,
-            sources: 'opensearch|mediawiki',
-            use_ai: useAI
+            use_ai: useAI,
+            context: JSON.stringify(dialogHistory) // Передаем историю диалога как контекст
         }).done(function (data) {
-            console.log('Search response:', data);
+            console.log('Unified search response:', data);
 
-            if (useAI && data.ai_result) {
-                displayAIResult(data.ai_result, query);
-            } else if (data.results && data.results.length > 0) {
-                displaySearchResults(data.results, query);
+            var results = [];
+
+            // Добавляем результаты CirrusSearch
+            if (data.results && data.results.cirrus) {
+                data.results.cirrus.forEach(function (result) {
+                    results.push({
+                        id: 'cirrus_' + result.id,
+                        title: result.title,
+                        content: result.snippet || result.title,
+                        score: result.score,
+                        source: 'mediawiki',
+                        url: result.url
+                    });
+                });
+            }
+
+            // Добавляем результаты AI-поиска, если они есть
+            if (useAI && data.results && data.results.ai) {
+                displayAIResult(data.results.ai, query);
+            } else if (results.length > 0) {
+                displaySearchResults(results, query);
             } else {
                 $('#support-search-results').html(
                     '<div class="support-no-results">' +
@@ -681,12 +700,14 @@
     function loadTickets() {
         var api = new mw.Api();
 
+        // Используем новый API-мост для обращения к Redmine
         api.get({
-            action: 'supportticket',
-            operation: 'list'
+            action: 'redminebridge',
+            operation: 'list_tickets',
+            format: 'json'
         }).done(function (data) {
-            if (data.tickets && data.tickets.length > 0) {
-                displayTickets(data.tickets);
+            if (data.redmine_result.tickets && data.redmine_result.tickets.length > 0) {
+                displayTickets(data.redmine_result.tickets);
             } else {
                 $('#support-tickets-list').html(
                     '<div class="support-empty-list">' +
@@ -763,13 +784,15 @@
             '</div>'
         );
 
+        // Используем новый API-мост для обращения к Redmine
         api.get({
-            action: 'supportticket',
-            operation: 'get',
-            ticket_id: ticketId
+            action: 'redminebridge',
+            operation: 'get_ticket',
+            ticket_id: ticketId,
+            format: 'json'
         }).done(function (data) {
-            if (data.ticket) {
-                displayTicketDetails(data.ticket);
+            if (data.redmine_result.ticket) {
+                displayTicketDetails(data.redmine_result.ticket);
             } else {
                 $('#support-ticket-details').html(
                     '<div class="support-error">' +
@@ -938,7 +961,7 @@
         // Добавляем логирование для отладки
         console.log('Submitting ticket:', {
             subject: subject,
-            description: description,
+            description: description.substring(0, 50) + '...', // Логируем только начало описания
             priority: priority
         });
 
@@ -957,20 +980,21 @@
         $('#support-ticket-submit').prop('disabled', true);
         $('#support-ticket-submit').text(getMessage('supportsystem-dt-submitting', 'Submitting...'));
 
+        // Используем новый API-мост для обращения к Redmine
         api.post({
-            action: 'supportticket',
-            operation: 'create',
+            action: 'redminebridge',
+            operation: 'create_ticket',
             subject: subject,
             description: description,
             priority: priority
         }).done(function (data) {
             console.log('Ticket creation response:', data);
 
-            if (data.ticket) {
+            if (data.redmine_result.ticket) {
                 if (selectedSolution) {
-                    attachSolution(data.ticket.id);
+                    attachSolution(data.redmine_result.ticket.id);
                 } else {
-                    showTicketSuccess(data.ticket.id);
+                    showTicketSuccess(data.redmine_result.ticket.id);
                 }
             } else {
                 mw.notify(getMessage('supportsystem-search-ticket-error', 'Error creating ticket'), { type: 'error' });
@@ -991,12 +1015,12 @@
     function attachSolution(ticketId) {
         var api = new mw.Api();
 
+        // Используем новый API-мост для обращения к Redmine
         api.post({
-            action: 'supportticket',
-            operation: 'solution',  // Используем правильное имя параметра
+            action: 'redminebridge',
+            operation: 'add_comment',
             ticket_id: ticketId,
-            solution: selectedSolution,
-            source: selectedSource
+            comment: "Найденное решение: " + selectedSolution + "\n\nИсточник: " + selectedSource
         }).done(function () {
             showTicketSuccess(ticketId);
         }).fail(function (error) {
@@ -1015,9 +1039,10 @@
 
         $('#support-comment-submit').prop('disabled', true);
 
+        // Используем новый API-мост для обращения к Redmine
         api.post({
-            action: 'supportticket',
-            operation: 'comment',  // Используем правильное имя параметра
+            action: 'redminebridge',
+            operation: 'add_comment',
             ticket_id: ticketId,
             comment: comment
         }).done(function (data) {
@@ -1427,12 +1452,12 @@
             }).done(function (data) {
                 console.log('Ticket creation response:', data);
 
-                if (data.ticket) {
+                if (data.redmine_result.ticket) {
                     // Если есть решение, прикрепить его к заявке
                     if (selectedSolution) {
-                        attachSolution(data.ticket.id);
+                        attachSolution(data.redmine_result.ticket.id);
                     } else {
-                        showTicketSuccess(data.ticket.id);
+                        showTicketSuccess(data.redmine_result.ticket.id);
                     }
                 } else {
                     mw.notify(getMessage('supportsystem-search-ticket-error', 'Error creating ticket'), { type: 'error' });
@@ -1471,4 +1496,18 @@
 
     // Инициализация при загрузке DOM
     $(init);
+
+    // Глобальная обработка ошибок AJAX
+    $(document).ajaxError(function (event, jqXHR, settings, thrownError) {
+        console.error("AJAX Error:", thrownError, "Status:", jqXHR.status, "URL:", settings.url);
+
+        // Показываем уведомление пользователю
+        if (jqXHR.status === 0) {
+            mw.notify("Проблема с подключением к серверу. Проверьте соединение и попробуйте снова.",
+                { type: "error", autoHide: false });
+        } else if (jqXHR.status >= 500) {
+            mw.notify("Ошибка сервера (HTTP " + jqXHR.status + ").",
+                { type: "error", autoHide: false });
+        }
+    });
 }());

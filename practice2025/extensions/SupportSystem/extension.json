@@ -12,6 +12,7 @@
         "MediaWiki": ">= 1.39.0"
     },
     "AutoloadNamespaces": {
+        "MediaWiki\\Extension\\SupportSystem\\API\\": "includes/API/",
         "MediaWiki\\Extension\\SupportSystem\\": "includes/",
         "MediaWiki\\SpecialPage\\": "specials/"
     },
@@ -36,10 +37,15 @@
         },
         "supportgraphadmin": {
             "class": "MediaWiki\\Extension\\SupportSystem\\API\\ApiSupportGraphAdmin"
+        },
+        "unifiedsearch": {
+            "class": "MediaWiki\\Extension\\SupportSystem\\API\\ApiUnifiedSearch"
         }
     },
     "Hooks": {
-        "BeforePageDisplay": "MediaWiki\\Extension\\SupportSystem\\Hooks::onBeforePageDisplay"
+        "BeforePageDisplay": "MediaWiki\\Extension\\SupportSystem\\Hooks::onBeforePageDisplay",
+        "CirrusSearchAlterQueryBuilder": "MediaWiki\\Extension\\SupportSystem\\CirrusSearchAIHook::onCirrusSearchAlterQueryBuilder",
+        "CirrusSearchResults": "MediaWiki\\Extension\\SupportSystem\\CirrusSearchAIHook::onCirrusSearchResults"
     },
     "ResourceModules": {
         "ext.supportSystem.styles": {
