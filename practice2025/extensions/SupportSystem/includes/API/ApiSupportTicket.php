@@ -13,25 +13,22 @@ class ApiSupportTicket extends ApiBase
     /**
      * Execute the API module
      */
-    /**
-     * Execute the API module
-     */
     public function execute()
     {
         $params = $this->extractRequestParams();
-        $ticketOperation = $params['operation']; // Используем параметр operation для совместимости
+        $operation = $params['operation']; // Используем consistently параметр operation
 
         $serviceDesk = new ServiceDesk();
 
         try {
-            switch ($ticketOperation) {
+            switch ($operation) {
                 case 'create':
                     $this->requirePostedParameters(['subject', 'description']);
 
                     $subject = $params['subject'];
                     $description = $params['description'];
                     $priority = $params['priority'];
-                    $assignedTo = $params['assigned_to'];
+                    $assignedTo = $params['assigned_to'] ?? null;
 
                     wfDebugLog('SupportSystem', "API: Creating ticket with subject: $subject");
 
@@ -123,7 +120,7 @@ class ApiSupportTicket extends ApiBase
     public function getAllowedParams()
     {
         return [
-            'operation' => [ // Изменение имени параметра
+            'operation' => [
                 ApiBase::PARAM_TYPE => ['create', 'get', 'list', 'comment', 'solution'],
                 ApiBase::PARAM_REQUIRED => true,
             ],
@@ -186,6 +183,6 @@ class ApiSupportTicket extends ApiBase
     public function isWriteMode()
     {
         $params = $this->extractRequestParams();
-        return in_array($params['operation'], ['create', 'comment', 'solution']);
+        return isset($params['operation']) && in_array($params['operation'], ['create', 'comment', 'solution']);
     }
 }

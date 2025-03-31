@@ -308,7 +308,10 @@
             console.error('Search error:', error);
         });
     }
-    
+    /**
+     * Search using AI
+     * @param {string} query
+     */
     function searchAI(query) {
         var api = new mw.Api();
         searchState.searchQuery = query || searchState.searchQuery || currentSolution;
@@ -321,10 +324,16 @@
                 answer: item.selectedOption
             });
         });
+
         $('#support-ai-loading').show();
         $('#support-ai-content').hide();
         $('#support-ai-container').show();
         $('#support-solution-container').hide();
+
+        console.log('AI search params:', {
+            query: searchState.searchQuery,
+            context: context
+        });
 
         api.get({
             action: 'supportsearch',
@@ -332,6 +341,8 @@
             use_ai: 1,
             context: JSON.stringify(context)
         }).done(function (data) {
+            console.log('AI search response:', data);
+
             searchState.aiSearchDone = true;
 
             if (data.ai_result && data.ai_result.success) {
@@ -371,22 +382,22 @@
             } else {
                 // Показать сообщение об ошибке и кнопку создания заявки
                 $('#support-ai-text').text(data.ai_result && data.ai_result.answer ||
-                    messages.ai_error || 'An error occurred while processing the AI request.');
+                    getMessage('supportsystem-dt-ai-error', 'An error occurred while processing the AI request.'));
                 $('#support-ai-loading').hide();
                 $('#support-ai-content').show();
                 $('#support-ai-sources').hide();
                 $('#support-ai-ticket-button').show();
             }
         }).fail(function (error) {
+            console.error('AI search error:', error);
+
             searchState.aiSearchDone = true;
 
-            $('#support-ai-text').text(messages.ai_error || 'An error occurred while processing the AI request.');
+            $('#support-ai-text').text(getMessage('supportsystem-dt-ai-error', 'An error occurred while processing the AI request.'));
             $('#support-ai-loading').hide();
             $('#support-ai-content').show();
             $('#support-ai-sources').hide();
             $('#support-ai-ticket-button').show();
-
-            console.error('Error in AI search:', error);
         });
     }
 
@@ -428,8 +439,8 @@
     }
 
     /**
-     * Поиск решений
-     * @param {string} query Поисковый запрос
+     * Search for solutions
+     * @param {string} query
      */
     function searchSolutions(query) {
         var api = new mw.Api();
@@ -439,7 +450,7 @@
         $('#support-search-results').html(
             '<div class="support-loading">' +
             '<div class="support-spinner"></div>' +
-            '<p>' + (messages.search_loading || 'Searching...') + '</p>' +
+            '<p>' + getMessage('supportsystem-search-loading', 'Searching...') + '</p>' +
             '</div>'
         );
 
@@ -454,7 +465,11 @@
             apiParams.sources = 'opensearch|mediawiki';
         }
 
+        console.log('Search params:', apiParams);
+
         api.get(apiParams).done(function (data) {
+            console.log('Search response:', data);
+
             if (useAI && data.ai_result) {
                 displayAIResult(data.ai_result, query);
             } else if (data.results && data.results.length > 0) {
@@ -462,17 +477,17 @@
             } else {
                 $('#support-search-results').html(
                     '<div class="support-no-results">' +
-                    '<p>' + (messages.search_noresults || 'No results found. Try changing your query.') + '</p>' +
+                    '<p>' + getMessage('supportsystem-search-noresults', 'No results found. Try changing your query.') + '</p>' +
                     '</div>'
                 );
             }
         }).fail(function (error) {
+            console.error('Search error:', error);
             $('#support-search-results').html(
                 '<div class="support-error">' +
-                '<p>' + (messages.search_error || 'An error occurred during the search.') + '</p>' +
+                '<p>' + getMessage('supportsystem-search-error', 'An error occurred during the search.') + '</p>' +
                 '</div>'
             );
-            console.error('Search error:', error);
         });
     }
 
@@ -823,106 +838,89 @@
         $('#support-comment-text').val('');
     }
 
-    /**
-     * Добавление комментария к заявке
-     * @param {number} ticketId ID заявки
-     * @param {string} comment Текст комментария
-     */
-    function addComment(ticketId, comment) {
-        var api = new mw.Api();
-
-        $('#support-comment-submit').prop('disabled', true);
-
-        api.post({
-            action: 'supportticket',
-            operation: 'comment',
-            ticket_id: ticketId,
-            comment: comment
-        }).done(function (data) {
-            if (data.result === 'success') {
-                mw.notify(mw.msg('supportsystem-sd-ticket-comment-success') || 'Comment added successfully', { type: 'success' });
-                $('#support-comment-text').val('');
-
-                // Обновить данные заявки
-                viewTicket(ticketId);
-            } else {
-                mw.notify(mw.msg('supportsystem-sd-ticket-comment-error') || 'Error adding comment', { type: 'error' });
-            }
-        }).fail(function (error) {
-            mw.notify(mw.msg('supportsystem-sd-ticket-comment-error') || 'Error adding comment', { type: 'error' });
-            console.error('Error adding comment:', error);
-        }).always(function () {
-            $('#support-comment-submit').prop('disabled', false);
-        });
-    }
-
-    /**
- * Показать форму создания заявки
- * @param {string} solution Текст решения (если есть)
- * @param {string} source Источник решения
- */
     function showTicketForm(solution, source) {
         selectedSolution = solution || '';
         selectedSource = source || '';
 
-        // Убедимся, что все тексты полей корректно загружаются
-        var ticketSubjectLabel = mw.msg('supportsystem-dt-ticket-subject') || 'Ticket Subject';
-        var ticketDescriptionLabel = mw.msg('supportsystem-dt-ticket-description') || 'Problem Description';
-        var ticketPriorityLabel = mw.msg('supportsystem-dt-ticket-priority') || 'Priority';
-        var lowPriorityLabel = mw.msg('supportsystem-dt-priority-low') || 'Low';
-        var normalPriorityLabel = mw.msg('supportsystem-dt-priority-normal') || 'Normal';
-        var highPriorityLabel = mw.msg('supportsystem-dt-priority-high') || 'High';
-        var urgentPriorityLabel = mw.msg('supportsystem-dt-priority-urgent') || 'Urgent';
-        var cancelButtonLabel = mw.msg('supportsystem-dt-cancel') || 'Cancel';
-        var submitButtonLabel = mw.msg('supportsystem-dt-submit') || 'Submit';
-
-        // Обновим текст элементов формы
-        $('#support-ticket-subject-label').text(ticketSubjectLabel);
-        $('#support-ticket-description-label').text(ticketDescriptionLabel);
-        $('#support-ticket-priority-label').text(ticketPriorityLabel);
-        $('#support-ticket-cancel').text(cancelButtonLabel);
-        $('#support-ticket-submit').text(submitButtonLabel);
-
-        // Обновим варианты приоритета
-        $('#support-ticket-priority option[value="low"]').text(lowPriorityLabel);
-        $('#support-ticket-priority option[value="normal"]').text(normalPriorityLabel);
-        $('#support-ticket-priority option[value="high"]').text(highPriorityLabel);
-        $('#support-ticket-priority option[value="urgent"]').text(urgentPriorityLabel);
-
-        // Установим значения для полей формы
-        $('#support-ticket-subject').val(mw.msg('supportsystem-search-default-subject') || 'Help Request');
+        // Вместо использования переменных шаблона напрямую
+        // используем функцию getMessage для получения текста сообщения или значения по умолчанию
+        $('#support-ticket-subject').val(getMessage('supportsystem-search-default-subject', 'Help Request'));
 
         if (solution) {
             $('#support-solution-text').text(solution);
-            $('#support-solution-source').text(mw.msg('supportsystem-search-source', getSourceLabel(source)) || 'Source: ' + source);
+            $('#support-solution-source').text(getMessage('supportsystem-search-source', 'Source: {0}')
+                .replace('{0}', getSourceLabel(source)));
             $('#support-solution-display').show();
 
             var description = '';
 
             if (source === 'dialog') {
-                description = (mw.msg('supportsystem-dt-dialog-history') || 'Dialog History:') + '\n\n';
+                description = getMessage('supportsystem-dt-dialog-history', 'Dialog History:') + '\n\n';
 
                 dialogHistory.forEach(function (item, index) {
                     description += (index + 1) + '. ';
-                    description += (mw.msg('supportsystem-dt-dialog-item', item.selectedOption) || 'Answer: ' + item.selectedOption) + '\n';
+                    description += getMessage('supportsystem-dt-dialog-item', 'Answer: {0}')
+                        .replace('{0}', item.selectedOption) + '\n';
                 });
 
-                description += '\n' + (mw.msg('supportsystem-dt-dialog-solution') || 'Found Solution:') + '\n';
+                description += '\n' + getMessage('supportsystem-dt-dialog-solution', 'Found Solution:') + '\n';
                 description += solution;
             } else {
-                description = (mw.msg('supportsystem-search-default-description') || 'I need help with a problem.') + '\n\n';
-                description += (mw.msg('supportsystem-dt-dialog-solution') || 'Found Solution:') + '\n';
+                description = getMessage('supportsystem-search-default-description', 'I need help with a problem.') + '\n\n';
+                description += getMessage('supportsystem-dt-dialog-solution', 'Found Solution:') + '\n';
                 description += solution;
             }
 
             $('#support-ticket-description').val(description);
         } else {
             $('#support-solution-display').hide();
-            $('#support-ticket-description').val(mw.msg('supportsystem-search-default-description') || 'I need help with a problem.');
+            $('#support-ticket-description').val(getMessage('supportsystem-search-default-description', 'I need help with a problem.'));
         }
 
         $('#support-ticket-form').show();
     }
+
+    /**
+     * Вспомогательная функция для получения текста сообщения
+     * @param {string} key Ключ сообщения
+     * @param {string} defaultValue Значение по умолчанию
+     * @return {string} Текст сообщения
+     */
+    function getMessage(key, defaultValue) {
+        // Проверяем доступность mw.msg
+        if (typeof mw !== 'undefined' && mw.msg) {
+            var message = mw.msg(key);
+            // Проверяем, не является ли возвращаемое значение самим ключом
+            if (message.indexOf('⧼') === 0 && message.indexOf('⧽') === message.length - 1) {
+                return defaultValue;
+            }
+            return message;
+        }
+        return defaultValue;
+    }
+
+    // Улучшенная функция getSourceLabel
+    function getSourceLabel(source) {
+        var defaultLabels = {
+            'opensearch': 'Knowledge Base',
+            'mediawiki': 'MediaWiki',
+            'ai': 'AI Analysis',
+            'unknown': 'Unknown Source',
+            'dialog': 'Dialog'
+        };
+
+        var key = 'supportsystem-search-source-' + source;
+        var message = mw.msg(key);
+
+        if (message && message.indexOf('⧼') === -1 && message !== key) {
+            return message;
+        }
+
+        return defaultLabels[source] || 'Unknown Source';
+    }
+    /**
+     * Submit a ticket with the selected solution
+     */
     function submitTicket() {
         var api = new mw.Api();
 
@@ -930,31 +928,31 @@
         var description = $('#support-ticket-description').val();
         var priority = $('#support-ticket-priority').val();
 
-        if (!subject) {
-            mw.notify(mw.msg('supportsystem-sd-ticket-subject-required') || 'Ticket subject is required', { type: 'error' });
-            $('#support-ticket-subject').focus();
-            return;
-        }
-
-        if (!description) {
-            mw.notify(mw.msg('supportsystem-sd-ticket-description-required') || 'Problem description is required', { type: 'error' });
-            $('#support-ticket-description').focus();
-            return;
-        }
-
-        $('#support-ticket-submit').prop('disabled', true);
-        $('#support-ticket-submit').text(mw.msg('supportsystem-dt-submitting') || 'Submitting...');
-
-        // Логируем запрос для отладки
+        // Добавляем логирование для отладки
         console.log('Submitting ticket:', {
             subject: subject,
             description: description,
             priority: priority
         });
 
+        if (!subject) {
+            mw.notify(getMessage('supportsystem-sd-ticket-subject-required', 'Ticket subject is required'), { type: 'error' });
+            $('#support-ticket-subject').focus();
+            return;
+        }
+
+        if (!description) {
+            mw.notify(getMessage('supportsystem-sd-ticket-description-required', 'Problem description is required'), { type: 'error' });
+            $('#support-ticket-description').focus();
+            return;
+        }
+
+        $('#support-ticket-submit').prop('disabled', true);
+        $('#support-ticket-submit').text(getMessage('supportsystem-dt-submitting', 'Submitting...'));
+
         api.post({
             action: 'supportticket',
-            operation: 'create',
+            operation: 'create',  // Используем правильное имя параметра
             subject: subject,
             description: description,
             priority: priority
@@ -969,35 +967,43 @@
                     showTicketSuccess(data.ticket.id);
                 }
             } else {
-                mw.notify(mw.msg('supportsystem-search-ticket-error') || 'Error creating ticket', { type: 'error' });
+                mw.notify(getMessage('supportsystem-search-ticket-error', 'Error creating ticket'), { type: 'error' });
                 $('#support-ticket-submit').prop('disabled', false);
-                $('#support-ticket-submit').text(mw.msg('supportsystem-dt-submit') || 'Submit');
+                $('#support-ticket-submit').text(getMessage('supportsystem-dt-submit', 'Submit'));
             }
         }).fail(function (error) {
             console.error('Error creating ticket:', error);
-            mw.notify(mw.msg('supportsystem-search-ticket-error') || 'Error creating ticket', { type: 'error' });
+            mw.notify(getMessage('supportsystem-search-ticket-error', 'Error creating ticket'), { type: 'error' });
             $('#support-ticket-submit').prop('disabled', false);
-            $('#support-ticket-submit').text(mw.msg('supportsystem-dt-submit') || 'Submit');
+            $('#support-ticket-submit').text(getMessage('supportsystem-dt-submit', 'Submit'));
         });
     }
-
+    /**
+     * Attach a solution to a ticket
+     * @param {number} ticketId
+     */
     function attachSolution(ticketId) {
         var api = new mw.Api();
 
         api.post({
             action: 'supportticket',
-            operation: 'solution',
+            operation: 'solution',  // Используем правильное имя параметра
             ticket_id: ticketId,
             solution: selectedSolution,
             source: selectedSource
         }).done(function () {
             showTicketSuccess(ticketId);
         }).fail(function (error) {
+            // Даже если не удалось прикрепить решение, тикет всё равно создан
             showTicketSuccess(ticketId);
             console.error('Error attaching solution:', error);
         });
     }
-
+    /**
+     * Add a comment to a ticket
+     * @param {number} ticketId
+     * @param {string} comment
+     */
     function addComment(ticketId, comment) {
         var api = new mw.Api();
 
@@ -1005,21 +1011,21 @@
 
         api.post({
             action: 'supportticket',
-            operation: 'comment', // Изменено с 'action' на 'operation'
+            operation: 'comment',  // Используем правильное имя параметра
             ticket_id: ticketId,
             comment: comment
         }).done(function (data) {
             if (data.result === 'success') {
-                mw.notify(mw.msg('supportsystem-sd-ticket-comment-success') || 'Comment added successfully', { type: 'success' });
+                mw.notify(getMessage('supportsystem-sd-ticket-comment-success', 'Comment added successfully'), { type: 'success' });
                 $('#support-comment-text').val('');
 
                 // Обновить данные заявки
                 viewTicket(ticketId);
             } else {
-                mw.notify(mw.msg('supportsystem-sd-ticket-comment-error') || 'Error adding comment', { type: 'error' });
+                mw.notify(getMessage('supportsystem-sd-ticket-comment-error', 'Error adding comment'), { type: 'error' });
             }
         }).fail(function (error) {
-            mw.notify(mw.msg('supportsystem-sd-ticket-comment-error') || 'Error adding comment', { type: 'error' });
+            mw.notify(getMessage('supportsystem-sd-ticket-comment-error', 'Error adding comment'), { type: 'error' });
             console.error('Error adding comment:', error);
         }).always(function () {
             $('#support-comment-submit').prop('disabled', false);

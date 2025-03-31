@@ -198,3 +198,7 @@ wfLoadExtension('SupportSystem');
 wfLoadExtension('Elastica');
 wfLoadExtension('CirrusSearch');
 wfLoadExtension('SyntaxHighlight_GeSHi');
+
+
+$wgDebugLogGroups['SupportSystem'] = '/var/log/mediawiki/support-system.log';
+$wgDebugLogGroups['http'] = '/var/log/mediawiki/http.log';
