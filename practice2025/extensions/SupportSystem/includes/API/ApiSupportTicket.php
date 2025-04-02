@@ -3,12 +3,15 @@
 namespace MediaWiki\Extension\SupportSystem\API;
 
 use ApiBase;
-use MediaWiki\MediaWikiServices;
-use Http;
+use MediaWiki\Extension\SupportSystem\ServiceDesk;
 use MWException;
 
 /**
  * API module for ticket management
+ * 
+ * Этот модуль предоставляет API для работы с тикетами через MediaWiki.
+ * Он является тонкой оболочкой вокруг класса ServiceDesk,
+ * добавляя проверку параметров и обработку ошибок в стиле MediaWiki.
  */
 class ApiSupportTicket extends ApiBase
 {
@@ -21,169 +24,68 @@ class ApiSupportTicket extends ApiBase
         $operation = $params['operation'];
 
         try {
-            $config = MediaWikiServices::getInstance()->getMainConfig();
-            $redmineUrl = $config->get('SupportSystemRedmineURL');
-            $apiKey = $config->get('SupportSystemRedmineAPIKey');
+            // Создаем экземпляр ServiceDesk для работы с Redmine
+            $serviceDesk = new ServiceDesk();
 
+            // Обрабатываем разные операции
             switch ($operation) {
                 case 'create':
                     $this->requirePostedParameters(['subject', 'description']);
-
                     $subject = $params['subject'];
                     $description = $params['description'];
                     $priority = $params['priority'];
                     $assignedTo = $params['assigned_to'] ?? null;
-                    $priorityId = $this->getPriorityId($priority);
-                    $issueData = [
-                        'issue' => [
-                            'subject' => $subject,
-                            'description' => $description,
-                            'project_id' => 1,  // Project ID for 'support-system'
-                            'priority_id' => $priorityId,
-                            'tracker_id' => 1,
-                            'status_id' => 1 
-                        ]
-                    ];
-
-                    if ($assignedTo) {
-                        $issueData['issue']['assigned_to_id'] = $assignedTo;
+                    wfDebugLog('SupportSystem', "API: создание тикета: $subject");
+                    try {
+                        $ticket = $serviceDesk->createTicket(
+                            $subject,
+                            $description,
+                            $priority,
+                            $assignedTo
+                        );
+                        $this->getResult()->addValue(null, 'ticket', $ticket);
+                    } catch (MWException $e) {
+                        wfDebugLog('SupportSystem', "API: ошибка создания тикета: " . $e->getMessage());
+                        $this->dieWithError($e->getMessage());
                     }
-
-                    $url = rtrim($redmineUrl, '/') . "/issues.json";
-
-                    $options = [
-                        'method' => 'POST',
-                        'timeout' => 30,
-                        'postData' => json_encode($issueData),
-                        'headers' => [
-                            'Content-Type' => 'application/json',
-                            'X-Redmine-API-Key' => $apiKey
-                        ]
-                    ];
-
-                    $response = Http::request($url, $options);
-
-                    if ($response === false) {
-                        $this->dieWithError('Error connecting to Redmine');
-                    }
-
-                    $statusCode = Http::getLastStatusCode();
-                    if ($statusCode >= 400) {
-                        $this->dieWithError("Redmine API returned error status: $statusCode");
-                    }
-
-                    $data = json_decode($response, true);
-                    if (!isset($data['issue'])) {
-                        $this->dieWithError('Invalid response format from Redmine');
-                    }
-
-                    $this->getResult()->addValue(null, 'ticket', $data['issue']);
                     break;
 
                 case 'get':
                     $ticketId = $params['ticket_id'];
-
                     if (!$ticketId) {
                         $this->dieWithError(['apierror-invalidparameter', 'ticket_id']);
                     }
-
-                    $url = rtrim($redmineUrl, '/') . "/issues/{$ticketId}.json";
-                    $options = [
-                        'method' => 'GET',
-                        'timeout' => 30,
-                        'headers' => [
-                            'X-Redmine-API-Key' => $apiKey
-                        ]
-                    ];
-
-                    $response = Http::request($url, $options);
-
-                    if ($response === false) {
-                        $this->dieWithError('Error connecting to Redmine');
-                    }
-
-                    $statusCode = Http::getLastStatusCode();
-                    if ($statusCode >= 400) {
+                    $ticket = $serviceDesk->getTicket($ticketId);
+                    if ($ticket) {
+                        $this->getResult()->addValue(null, 'ticket', $ticket);
+                    } else {
                         $this->dieWithError('supportsystem-error-ticket-not-found');
                     }
-
-                    $data = json_decode($response, true);
-                    if (!isset($data['issue'])) {
-                        $this->dieWithError('Invalid response format from Redmine');
-                    }
-
-                    $this->getResult()->addValue(null, 'ticket', $data['issue']);
                     break;
 
                 case 'list':
-                    $url = rtrim($redmineUrl, '/') . "/issues.json";
-                    $options = [
-                        'method' => 'GET',
-                        'timeout' => 30,
-                        'headers' => [
-                            'X-Redmine-API-Key' => $apiKey
-                        ]
-                    ];
-
-                    $response = Http::request($url, $options);
-
-                    if ($response === false) {
-                        $this->dieWithError('Error connecting to Redmine');
-                    }
-
-                    $data = json_decode($response, true);
-                    if (!isset($data['issues'])) {
-                        $this->dieWithError('Invalid response format from Redmine');
-                    }
-
-                    $this->getResult()->addValue(null, 'tickets', $data['issues']);
+                    $limit = $params['limit'];
+                    $offset = $params['offset'];
+                    $tickets = $serviceDesk->getAllTickets($limit, $offset);
+                    $this->getResult()->addValue(null, 'tickets', $tickets);
                     break;
 
                 case 'comment':
                     $this->requirePostedParameters(['ticket_id', 'comment']);
-
                     $ticketId = $params['ticket_id'];
                     $comment = $params['comment'];
-
                     if (!$ticketId) {
                         $this->dieWithError(['apierror-invalidparameter', 'ticket_id']);
                     }
-
-                    $issueData = [
-                        'issue' => [
-                            'notes' => $comment
-                        ]
-                    ];
-
-                    $url = rtrim($redmineUrl, '/') . "/issues/{$ticketId}.json";
-
-                    $options = [
-                        'method' => 'PUT',
-                        'timeout' => 30,
-                        'postData' => json_encode($issueData),
-                        'headers' => [
-                            'Content-Type' => 'application/json',
-                            'X-Redmine-API-Key' => $apiKey
-                        ]
-                    ];
-
-                    $response = Http::request($url, $options);
-
-                    if ($response === false) {
+                    $success = $serviceDesk->addComment($ticketId, $comment);
+                    if ($success) {
+                        $this->getResult()->addValue(null, 'result', 'success');
+                    } else {
                         $this->dieWithError('supportsystem-error-add-comment-failed');
                     }
-
-                    $statusCode = Http::getLastStatusCode();
-                    if ($statusCode >= 400) {
-                        $this->dieWithError('supportsystem-error-add-comment-failed');
-                    }
-
-                    $this->getResult()->addValue(null, 'result', 'success');
                     break;
-
                 case 'solution':
                     $this->requirePostedParameters(['ticket_id', 'solution']);
-
                     $ticketId = $params['ticket_id'];
                     $solution = $params['solution'];
                     $source = $params['source'];
@@ -191,45 +93,19 @@ class ApiSupportTicket extends ApiBase
                     if (!$ticketId) {
                         $this->dieWithError(['apierror-invalidparameter', 'ticket_id']);
                     }
-
-                    $comment = "Найденное решение: {$solution}\n\nИсточник: {$source}";
-
-                    $issueData = [
-                        'issue' => [
-                            'notes' => $comment
-                        ]
-                    ];
-
-                    $url = rtrim($redmineUrl, '/') . "/issues/{$ticketId}.json";
-
-                    $options = [
-                        'method' => 'PUT',
-                        'timeout' => 30,
-                        'postData' => json_encode($issueData),
-                        'headers' => [
-                            'Content-Type' => 'application/json',
-                            'X-Redmine-API-Key' => $apiKey
-                        ]
-                    ];
-
-                    $response = Http::request($url, $options);
-
-                    if ($response === false) {
+                    $success = $serviceDesk->attachSolution($ticketId, $solution, $source);
+                    if ($success) {
+                        $this->getResult()->addValue(null, 'result', 'success');
+                    } else {
                         $this->dieWithError('supportsystem-error-attach-solution-failed');
                     }
-
-                    $statusCode = Http::getLastStatusCode();
-                    if ($statusCode >= 400) {
-                        $this->dieWithError('supportsystem-error-attach-solution-failed');
-                    }
-
-                    $this->getResult()->addValue(null, 'result', 'success');
                     break;
 
                 default:
                     $this->dieWithError(['apierror-invalidparameter', 'operation']);
             }
-        } catch (\Exception $e) {
+        } catch (MWException $e) {
+            wfDebugLog('SupportSystem', "API exception: " . $e->getMessage());
             $this->dieWithError($e->getMessage());
         }
     }
@@ -279,6 +155,39 @@ class ApiSupportTicket extends ApiBase
                 ApiBase::PARAM_DFLT => 'unknown',
                 ApiBase::PARAM_REQUIRED => false,
             ],
+            'limit' => [
+                ApiBase::PARAM_TYPE => 'integer',
+                ApiBase::PARAM_DFLT => 25,
+                ApiBase::PARAM_MIN => 1,
+                ApiBase::PARAM_MAX => 100,
+                ApiBase::PARAM_REQUIRED => false,
+            ],
+            'offset' => [
+                ApiBase::PARAM_TYPE => 'integer',
+                ApiBase::PARAM_DFLT => 0,
+                ApiBase::PARAM_MIN => 0,
+                ApiBase::PARAM_REQUIRED => false,
+            ],
+        ];
+    }
+
+    /**
+     * Examples for the API documentation
+     * @return array
+     */
+    public function getExamplesMessages()
+    {
+        return [
+            'action=supportticket&operation=create&subject=Test%20subject&description=Test%20description&priority=normal'
+            => 'apihelp-supportticket-example-1',
+            'action=supportticket&operation=get&ticket_id=1'
+            => 'apihelp-supportticket-example-2',
+            'action=supportticket&operation=list&limit=10'
+            => 'apihelp-supportticket-example-3',
+            'action=supportticket&operation=comment&ticket_id=1&comment=Test%20comment'
+            => 'apihelp-supportticket-example-4',
+            'action=supportticket&operation=solution&ticket_id=1&solution=Problem%20solved&source=Knowledge%20Base'
+            => 'apihelp-supportticket-example-5',
         ];
     }
 
@@ -290,22 +199,5 @@ class ApiSupportTicket extends ApiBase
     {
         $params = $this->extractRequestParams();
         return isset($params['operation']) && in_array($params['operation'], ['create', 'comment', 'solution']);
-    }
-
-    /**
-     * Get priority ID from name
-     * @param string $priorityName Priority name
-     * @return int Priority ID
-     */
-    private function getPriorityId(string $priorityName): int
-    {
-        $priorities = [
-            'low' => 1,
-            'normal' => 2,
-            'high' => 3,
-            'urgent' => 4
-        ];
-
-        return $priorities[strtolower($priorityName)] ?? 2;
     }
 }

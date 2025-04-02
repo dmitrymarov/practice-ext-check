@@ -1,6 +1,8 @@
-/**
- * JavaScript for the unified support system interface
- */
+
+// Глобальные переменные для хранения выбранного решения и источника
+var selectedSolution = '';
+var selectedSource = '';
+
 (function () {
     'use strict';
     var config = mw.config.get('supportsystemConfig') || {};
@@ -472,15 +474,25 @@
         });
     }
 
-    function loadTickets() {
+    function loadTickets(limit = 25, offset = 0) {
         var api = new mw.Api();
+        $('#support-tickets-list').html(
+            '<div class="support-loading">' +
+            '<div class="support-spinner"></div>' +
+            '<p>' + (mw.msg('supportsystem-sd-loading') || 'Loading tickets...') + '</p>' +
+            '</div>'
+        );
+        console.log('Загрузка тикетов (limit: ' + limit + ', offset: ' + offset + ')');
         api.get({
-            action: 'redminebridge',
-            operation: 'list_tickets',
-            format: 'json'
+            action: 'supportticket',
+            operation: 'list',
+            limit: limit,
+            offset: offset
         }).done(function (data) {
-            if (data.redmine_result.success && data.redmine_result.tickets && data.redmine_result.tickets.length > 0) {
-                displayTickets(data.redmine_result.tickets);
+            console.log('Ответ API на загрузку тикетов:', data);
+
+            if (data.tickets && data.tickets.length > 0) {
+                displayTickets(data.tickets);
             } else {
                 $('#support-tickets-list').html(
                     '<div class="support-empty-list">' +
@@ -488,7 +500,12 @@
                     '</div>'
                 );
             }
-        }).fail(function () {
+        }).fail(function (xhr, status, error) {
+            console.error('Ошибка загрузки тикетов:', {
+                status: status,
+                error: error,
+                response: xhr.responseText || 'Нет текста ответа'
+            });
             $('#support-tickets-list').html(
                 '<div class="support-error">' +
                 '<p>' + (mw.msg('supportsystem-sd-error') || 'Error loading tickets') + '</p>' +
@@ -506,20 +523,22 @@
             return new Date(b.created_on) - new Date(a.created_on);
         });
         tickets.forEach(function (ticket) {
-            var statusClass = 'support-status-' + (ticket.status || 'new').replace(' ', '-').toLowerCase();
-            var priorityClass = 'support-priority-' + (ticket.priority || 'normal').toLowerCase();
+            var statusName = ((ticket.status || {}).name || 'New');
+            var statusClass = 'support-status-' + statusName.toLowerCase().replace(' ', '-');
+            var priorityName = ((ticket.priority || {}).name || 'Normal');
+            var priorityClass = 'support-priority-' + priorityName.toLowerCase().replace(' ', '-');
             listHtml +=
                 '<div class="support-ticket-item" data-ticket-id="' + ticket.id + '">' +
                 '<div class="support-ticket-header">' +
                 '<h4>#' + ticket.id + ': ' + ticket.subject + '</h4>' +
                 '<div class="support-ticket-meta">' +
                 '<span class="support-status-badge ' + statusClass + '">' +
-                (ticket.status || 'new') + '</span>' +
+                statusName + '</span>' +
                 '</div>' +
                 '</div>' +
                 '<div class="support-ticket-info">' +
                 '<span class="support-priority-badge ' + priorityClass + '">' +
-                ticket.priority + '</span>' +
+                priorityName + '</span>' +
                 '<span class="support-ticket-date">' + formatDate(ticket.created_on) + '</span>' +
                 '</div>' +
                 '</div>';
@@ -537,7 +556,6 @@
      */
     function viewTicket(ticketId) {
         var api = new mw.Api();
-
         $('#support-tickets-list').hide();
         $('#support-ticket-details').show().data('ticket-id', ticketId);
         $('#support-ticket-details').html(
@@ -546,14 +564,15 @@
             '<p>' + (mw.msg('supportsystem-sd-loading') || 'Loading ticket...') + '</p>' +
             '</div>'
         );
+        console.log('Загрузка тикета #' + ticketId);
         api.get({
-            action: 'redminebridge',
-            operation: 'get_ticket',
-            ticket_id: ticketId,
-            format: 'json'
+            action: 'supportticket',
+            operation: 'get',
+            ticket_id: ticketId
         }).done(function (data) {
-            if (data.redmine_result.success && data.redmine_result.ticket) {
-                displayTicketDetails(data.redmine_result.ticket);
+            console.log('Ответ API на загрузку тикета:', data);
+            if (data.ticket) {
+                displayTicketDetails(data.ticket);
             } else {
                 $('#support-ticket-details').html(
                     '<div class="support-error">' +
@@ -567,7 +586,12 @@
                     $('#support-tickets-list').show();
                 });
             }
-        }).fail(function () {
+        }).fail(function (xhr, status, error) {
+            console.error('Ошибка загрузки тикета #' + ticketId + ':', {
+                status: status,
+                error: error,
+                response: xhr.responseText || 'Нет текста ответа'
+            });
             $('#support-ticket-details').html(
                 '<div class="support-error">' +
                 '<p>' + (mw.msg('supportsystem-sd-ticket-error') || 'Error loading ticket') + '</p>' +
@@ -586,28 +610,99 @@
      * @param {Object} ticket Данные заявки
      */
     function displayTicketDetails(ticket) {
-        $('#support-ticket-details-title').text('#' + ticket.id + ': ' + ticket.subject);
-        var statusClass = 'support-status-' + (ticket.status || 'new').replace(' ', '-').toLowerCase();
-        $('#support-ticket-status').text(ticket.status || 'new').addClass(statusClass);
-        var priorityClass = 'support-priority-' + (ticket.priority || 'normal').toLowerCase();
-        $('#support-ticket-priority-value').text(ticket.priority || 'normal').addClass(priorityClass);
-        $('#support-ticket-created-date').text(formatDate(ticket.created_on));
-        $('#support-ticket-description-text').text(ticket.description);
-        var commentsHtml = '';
-        if (ticket.comments && ticket.comments.length > 0) {
-            ticket.comments.forEach(function (comment) {
-                commentsHtml += '<div class="support-comment">' +
-                    '<div class="support-comment-content">' + comment.text + '</div>' +
-                    '<div class="support-comment-meta">' +
-                    '<span class="support-comment-date">' + formatDate(comment.created_on) + '</span>' +
-                    '</div>' +
-                    '</div>';
+        console.log('Отображение деталей тикета:', ticket);
+        if ($('#support-ticket-details-title').length === 0) {
+            $('#support-ticket-details').html(`
+            <div class="support-ticket-details-header">
+                <h3 id="support-ticket-details-title"></h3>
+                <button id="support-ticket-details-back" class="support-button-secondary">
+                    ${mw.msg('supportsystem-sd-ticket-back') || 'Back to List'}
+                </button>
+            </div>
+            
+            <div class="support-ticket-details-info">
+                <div class="support-ticket-status">
+                    <span class="support-label">${mw.msg('supportsystem-sd-ticket-status') || 'Status'}:</span>
+                    <span id="support-ticket-status"></span>
+                </div>
+                <div class="support-ticket-priority">
+                    <span class="support-label">${mw.msg('supportsystem-sd-ticket-priority') || 'Priority'}:</span>
+                    <span id="support-ticket-priority-value"></span>
+                </div>
+                <div class="support-ticket-created">
+                    <span class="support-label">${mw.msg('supportsystem-sd-ticket-created') || 'Created On'}:</span>
+                    <span id="support-ticket-created-date"></span>
+                </div>
+            </div>
+            
+            <div class="support-ticket-description-section">
+                <h4>${mw.msg('supportsystem-sd-ticket-description') || 'Description'}</h4>
+                <div id="support-ticket-description-text" class="support-ticket-description-content"></div>
+            </div>
+            
+            <div class="support-ticket-comments-section">
+                <h4>${mw.msg('supportsystem-sd-ticket-comments') || 'Comments'}</h4>
+                <div id="support-ticket-comments" class="support-ticket-comments-list"></div>
+                
+                <div class="support-comment-form">
+                    <h5>${mw.msg('supportsystem-sd-ticket-add-comment') || 'Add Comment'}</h5>
+                    <textarea id="support-comment-text" class="support-textarea" 
+                        placeholder="${mw.msg('supportsystem-sd-ticket-comment-placeholder') || 'Enter your comment...'}"></textarea>
+                    <button id="support-comment-submit" class="support-button-primary">
+                        ${mw.msg('supportsystem-sd-ticket-comment-submit') || 'Submit'}
+                    </button>
+                </div>
+            </div>
+        `);
+            $('#support-ticket-details-back').on('click', function () {
+                $('#support-ticket-details').hide();
+                $('#support-tickets-list').show();
             });
-        } else {
+            $('#support-comment-submit').on('click', function () {
+                var ticketId = $('#support-ticket-details').data('ticket-id');
+                var comment = $('#support-comment-text').val().trim();
+                if (comment) {
+                    addComment(ticketId, comment);
+                } else {
+                    mw.notify(mw.msg('supportsystem-sd-ticket-comment-required') || 'Please enter a comment', { type: 'error' });
+                }
+            });
+        }
+        $('#support-ticket-details-title').text('#' + ticket.id + ': ' + ticket.subject);
+        var statusName = ((ticket.status || {}).name || 'New');
+        var statusClass = 'support-status-' + statusName.toLowerCase().replace(' ', '-');
+        $('#support-ticket-status').text(statusName)
+            .removeClass()
+            .addClass(statusClass);
+        var priorityName = ((ticket.priority || {}).name || 'Normal');
+        var priorityClass = 'support-priority-' + priorityName.toLowerCase().replace(' ', '-');
+        $('#support-ticket-priority-value').text(priorityName)
+            .removeClass()
+            .addClass(priorityClass);
+        $('#support-ticket-created-date').text(formatDate(ticket.created_on));
+        $('#support-ticket-description-text').text(ticket.description || '');
+        var commentsHtml = '';
+        var hasComments = false;
+
+        if (ticket.journals && ticket.journals.length > 0) {
+            ticket.journals.forEach(function (journal) {
+                if (journal.notes && journal.notes.trim()) {
+                    hasComments = true;
+                    commentsHtml += '<div class="support-comment">' +
+                        '<div class="support-comment-content">' + journal.notes + '</div>' +
+                        '<div class="support-comment-meta">' +
+                        '<span class="support-comment-author">' +
+                        (journal.user && journal.user.name ? journal.user.name : 'Unknown') + '</span> ' +
+                        '<span class="support-comment-date">' + formatDate(journal.created_on) + '</span>' +
+                        '</div>' +
+                        '</div>';
+                }
+            });
+        }
+        if (!hasComments) {
             commentsHtml = '<p class="support-no-comments">' +
                 (mw.msg('supportsystem-sd-ticket-no-comments') || 'No comments yet') + '</p>';
         }
-
         $('#support-ticket-comments').html(commentsHtml);
         $('#support-comment-text').val('');
     }
@@ -640,79 +735,101 @@
                 description += getMessage('supportsystem-dt-dialog-solution', 'Found Solution:') + '\n';
                 description += solution;
             }
-
             $('#support-ticket-description').val(description);
         } else {
             $('#support-solution-display').hide();
             $('#support-ticket-description').val(getMessage('supportsystem-search-default-description', 'I need help with a problem.'));
         }
-
         $('#support-ticket-form').show();
     }
     function submitTicket() {
         var api = new mw.Api();
-
         var subject = $('#support-ticket-subject').val();
         var description = $('#support-ticket-description').val();
         var priority = $('#support-ticket-priority').val();
-
         if (!subject) {
             mw.notify(getMessage('supportsystem-sd-ticket-subject-required', 'Ticket subject is required'), { type: 'error' });
             $('#support-ticket-subject').focus();
             return;
         }
-
         if (!description) {
             mw.notify(getMessage('supportsystem-sd-ticket-description-required', 'Problem description is required'), { type: 'error' });
             $('#support-ticket-description').focus();
             return;
         }
-
         $('#support-ticket-submit').prop('disabled', true);
         $('#support-ticket-submit').text(getMessage('supportsystem-dt-submitting', 'Submitting...'));
+        console.log('Отправка запроса на создание тикета:', {
+            subject: subject,
+            priority: priority,
+            description_length: description.length
+        });
         api.post({
-            action: 'redminebridge',
-            operation: 'create_ticket',
+            action: 'supportticket',
+            operation: 'create',
             subject: subject,
             description: description,
             priority: priority
         }).done(function (data) {
-            if (data.redmine_result.success && data.redmine_result.ticket) {
-                if (selectedSolution) {
-                    attachSolution(data.redmine_result.ticket.id);
-                } else {
-                    showTicketSuccess(data.redmine_result.ticket.id);
-                }
+            console.log('Ответ API на создание тикета:', data);
+            if (data.ticket) {
+                if (selectedSolution) { attachSolution(data.ticket.id); } 
+                else { showTicketSuccess(data.ticket.id); }
             } else {
-                mw.notify(getMessage('supportsystem-search-ticket-error', 'Error creating ticket'), { type: 'error' });
+                console.error('Ошибка создания тикета:', data);
+                mw.notify(getMessage('supportsystem-search-ticket-error', 'Error creating ticket'),
+                    { type: 'error' });
                 $('#support-ticket-submit').prop('disabled', false);
                 $('#support-ticket-submit').text(getMessage('supportsystem-dt-submit', 'Submit'));
             }
-        }).fail(function () {
-            mw.notify(getMessage('supportsystem-search-ticket-error', 'Error creating ticket'), { type: 'error' });
+        }).fail(function (xhr, status, error) {
+            console.error('Сбой запроса создания тикета:', {
+                status: status,
+                error: error,
+                response: xhr.responseText || 'Нет текста ответа'
+            });
+
+            var errorMsg = '';
+            try {
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    errorMsg = xhr.responseJSON.error.info || status || 'Unknown error';
+                } else { errorMsg = status || 'Unknown error'; }
+            } catch (e) { errorMsg = 'Error parsing response'; }
+            mw.notify(getMessage('supportsystem-search-ticket-error', 'Error creating ticket') +
+                ': ' + errorMsg, { type: 'error' });
             $('#support-ticket-submit').prop('disabled', false);
             $('#support-ticket-submit').text(getMessage('supportsystem-dt-submit', 'Submit'));
         });
     }
+
     /**
      * Прикрепление решения к заявке
      * @param {number} ticketId ID заявки
      */
     function attachSolution(ticketId) {
         var api = new mw.Api();
+        console.log('Прикрепление решения к тикету #' + ticketId);
         api.post({
-            action: 'redminebridge',
-            operation: 'attach_solution',
+            action: 'supportticket',
+            operation: 'solution',
             ticket_id: ticketId,
             solution: selectedSolution,
             source: selectedSource
-        }).done(function () {
-            showTicketSuccess(ticketId);
-        }).fail(function () {
-            showTicketSuccess(ticketId);
+        }).done(function (data) {
+            console.log('Ответ API на прикрепление решения:', data);
+            if (data.result === 'success') {
+                showTicketSuccess(ticketId);
+            } else {
+                console.warn('Прикрепление решения могло быть неудачным:', data);
+            }
+        }).fail(function (xhr, status, error) {
+            console.error('Ошибка прикрепления решения:', {
+                status: status,
+                error: error,
+                response: xhr.responseText || 'Нет текста ответа'
+            });
         });
     }
-
     /**
      * Добавление комментария к заявке
      * @param {number} ticketId ID заявки
@@ -721,21 +838,31 @@
     function addComment(ticketId, comment) {
         var api = new mw.Api();
         $('#support-comment-submit').prop('disabled', true);
+        console.log('Добавление комментария к тикету #' + ticketId);
         api.post({
-            action: 'redminebridge',
-            operation: 'add_comment',
+            action: 'supportticket',
+            operation: 'comment',
             ticket_id: ticketId,
             comment: comment
         }).done(function (data) {
-            if (data.redmine_result.success) {
-                mw.notify(getMessage('supportsystem-sd-ticket-comment-success', 'Comment added successfully'), { type: 'success' });
+            console.log('Ответ API на добавление комментария:', data);
+            if (data.result === 'success') {
+                mw.notify(getMessage('supportsystem-sd-ticket-comment-success', 'Comment added successfully'),
+                    { type: 'success' });
                 $('#support-comment-text').val('');
                 viewTicket(ticketId);
             } else {
-                mw.notify(getMessage('supportsystem-sd-ticket-comment-error', 'Error adding comment'), { type: 'error' });
+                mw.notify(getMessage('supportsystem-sd-ticket-comment-error', 'Error adding comment'),
+                    { type: 'error' });
             }
-        }).fail(function () {
-            mw.notify(getMessage('supportsystem-sd-ticket-comment-error', 'Error adding comment'), { type: 'error' });
+        }).fail(function (xhr, status, error) {
+            console.error('Ошибка добавления комментария:', {
+                status: status,
+                error: error,
+                response: xhr.responseText || 'Нет текста ответа'
+            });
+            mw.notify(getMessage('supportsystem-sd-ticket-comment-error', 'Error adding comment'),
+                { type: 'error' });
         }).always(function () {
             $('#support-comment-submit').prop('disabled', false);
         });
@@ -757,6 +884,7 @@
         showPanel('tickets');
     }
 
+
     /**
      * Форматирование даты
      * @param {string} dateStr Строка с датой
@@ -769,7 +897,9 @@
         try {
             var date = new Date(dateStr);
             return date.toLocaleString();
-        } catch (e) { return dateStr; }
+        } catch (e) {
+            return dateStr;
+        }
     }
 
     /**
