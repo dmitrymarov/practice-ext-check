@@ -16,8 +16,7 @@
         "MediaWiki\\Extension\\SupportSystem\\": "includes/",
         "MediaWiki\\SpecialPage\\": "specials/"
     },
-    "SpecialPages": 
-    {
+    "SpecialPages": {
         "UnifiedSupport": {
             "class": "MediaWiki\\Extension\\SupportSystem\\Special\\SpecialUnifiedSupport"
         },
@@ -29,17 +28,20 @@
         "supportnode": {
             "class": "MediaWiki\\Extension\\SupportSystem\\API\\ApiSupportNode"
         },
-        "supportsearch": {
-            "class":"MediaWiki\\Extension\\SupportSystem\\API\\ApiSupportSearch"
-        },
         "supportticket": {
-            "class":"MediaWiki\\Extension\\SupportSystem\\API\\ApiSupportTicket"
+            "class": "MediaWiki\\Extension\\SupportSystem\\API\\ApiSupportTicket"
         },
         "supportgraphadmin": {
             "class": "MediaWiki\\Extension\\SupportSystem\\API\\ApiSupportGraphAdmin"
         },
         "unifiedsearch": {
             "class": "MediaWiki\\Extension\\SupportSystem\\API\\ApiUnifiedSearch"
+        },
+        "aibridge": {
+            "class": "MediaWiki\\Extension\\SupportSystem\\API\\ApiAIBridge"
+        },
+        "redminebridge": {
+            "class": "MediaWiki\\Extension\\SupportSystem\\API\\ApiRedmineBridge"
         }
     },
     "Hooks": {
@@ -163,7 +165,7 @@
             "value": "http://172.29.46.60:3000"
         },
         "SupportSystemRedmineAPIKey": {
-            "value": "c177337d75a1da3bb43d67ec9b9bb139b299502f"
+            "value": "e0d62b7b9695048dd4a4d44bbc9f074c865fcf2f"
         },
         "SupportSystemAIServiceURL": {
             "value": "http://172.29.46.60:5000"

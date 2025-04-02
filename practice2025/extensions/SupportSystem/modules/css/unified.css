@@ -173,8 +173,10 @@
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
+/* Общие стили для контейнеров решений и AI */
 .support-solution-container,
-.support-ai-container {
+.support-ai-container,
+.support-ai-result {
     background-color: white;
     border: 1px solid #ddd;
     border-radius: 8px;
@@ -184,16 +186,26 @@
 }
 
 .support-solution-box,
-.support-ai-box {
+.support-ai-box,
+.support-ai-answer,
+.support-solution-display {
     background-color: #f9f9f9;
-    border-left: 4px solid #3366cc;
     padding: 15px;
     margin-bottom: 15px;
+    border-radius: 4px;
+}
+
+.support-solution-box,
+.support-solution-display {
+    border-left: 4px solid #3366cc;
     border-radius: 0 4px 4px 0;
 }
 
-.support-ai-box {
-    border-left-color: #17a2b8;
+.support-ai-box,
+.support-ai-answer {
+    border-left: 4px solid #17a2b8;
+    border-radius: 0 4px 4px 0;
+    background-color: #f0f7fb;
 }
 
 .support-ai-sources {
@@ -204,7 +216,8 @@
 }
 
 .support-solution-actions,
-.support-ai-actions {
+.support-ai-actions,
+.support-result-actions {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
@@ -229,15 +242,6 @@
     font-size: 16px;
 }
 
-.support-search-button {
-    padding: 10px 20px;
-    background-color: #3366cc;
-    color: #fff;
-    border: none;
-    border-radius: 0 4px 4px 0;
-    cursor: pointer;
-}
-
 .support-search-options {
     margin-bottom: 15px;
 }
@@ -250,31 +254,20 @@
     margin-top: 20px;
 }
 
-.support-search-initial-message {
+/* Стили для сообщений пользователю */
+.support-search-initial-message,
+.support-no-results,
+.support-empty-list,
+.support-no-filtered-results {
     text-align: center;
     padding: 30px;
     background-color: #f8f9fa;
     border-radius: 4px;
     color: #666;
-}
-
-.support-ai-result {
-    background-color: white;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 20px;
     margin-bottom: 20px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
-.support-ai-answer {
-    background-color: #f0f7fb;
-    border-left: 4px solid #17a2b8;
-    padding: 15px;
-    margin-bottom: 15px;
-    border-radius: 0 4px 4px 0;
-}
-
+/* Результаты поиска */
 .support-result-card {
     margin-bottom: 20px;
     background-color: white;
@@ -319,18 +312,19 @@
     margin-bottom: 5px;
 }
 
-.support-result-actions {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: 15px;
-}
-
-.support-badge {
+/* Бейджи */
+.support-badge,
+.support-score-badge,
+.support-status-badge,
+.support-priority-badge {
     display: inline-block;
     padding: 3px 8px;
     border-radius: 12px;
-    color: white;
     font-size: 0.8em;
+}
+
+.support-badge {
+    color: white;
 }
 
 .support-badge-opensearch {
@@ -350,25 +344,12 @@
 }
 
 .support-score-badge {
-    display: inline-block;
-    padding: 3px 8px;
-    border-radius: 12px;
     background-color: #f0f0f0;
     color: #666;
-    font-size: 0.8em;
     margin-left: 5px;
 }
 
-.support-no-results,
-.support-no-filtered-results {
-    text-align: center;
-    padding: 30px;
-    background-color: #f8f9fa;
-    border-radius: 8px;
-    color: #666;
-    margin-bottom: 20px;
-}
-
+/* Индикатор загрузки */
 .support-loading {
     text-align: center;
     padding: 30px;
@@ -436,15 +417,7 @@
     align-items: center;
 }
 
-.support-status-badge,
-.support-priority-badge {
-    display: inline-block;
-    padding: 3px 8px;
-    border-radius: 12px;
-    font-size: 0.8em;
-    margin-right: 10px;
-}
-
+/* Статусы заявок */
 .support-status-new {
     background-color: #17a2b8;
     color: white;
@@ -465,6 +438,7 @@
     color: white;
 }
 
+/* Приоритеты заявок */
 .support-priority-low {
     background-color: #6c757d;
     color: white;
@@ -488,6 +462,7 @@
 .support-ticket-date {
     color: #666;
     font-size: 0.9em;
+    margin-left: 10px;
 }
 
 .support-ticket-details {
@@ -562,22 +537,6 @@
     margin-top: 20px;
 }
 
-.support-no-comments {
-    text-align: center;
-    padding: 20px;
-    color: #666;
-    background-color: #f8f9fa;
-    border-radius: 8px;
-}
-
-.support-empty-list {
-    text-align: center;
-    padding: 30px;
-    background-color: #f8f9fa;
-    border-radius: 8px;
-    color: #666;
-}
-
 /* Форма заявки */
 .support-form-overlay {
     position: fixed;
@@ -623,14 +582,6 @@
     font-size: 24px;
     cursor: pointer;
     color: #666;
-}
-
-.support-solution-display {
-    background-color: #f0f7fb;
-    border-left: 4px solid #17a2b8;
-    padding: 15px;
-    margin-bottom: 20px;
-    border-radius: 0 4px 4px 0;
 }
 
 .support-form-group {
@@ -694,21 +645,13 @@
         margin-top: 10px;
     }
 
-    .support-result-actions {
-        flex-direction: column;
-    }
-
-    .support-result-actions>* {
-        margin-top: 10px;
-        width: 100%;
-        text-align: center;
-    }
-
+    .support-result-actions,
     .support-solution-actions,
     .support-ai-actions {
         flex-direction: column;
     }
 
+    .support-result-actions>*,
     .support-solution-actions>*,
     .support-ai-actions>* {
         margin-top: 10px;

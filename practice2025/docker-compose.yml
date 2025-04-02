@@ -22,6 +22,9 @@ services:
       - MEDIAWIKI_ADMIN_USER=admin
       - MEDIAWIKI_ADMIN_PASS=adminpass
       - MEDIAWIKI_SITE_NAME=Support Knowledge Base
+      - REDMINE_URL=http://redmine:3000
+      - AI_SERVICE_URL=http://ai-service:5000
+      - OPENSEARCH_URL=http://opensearch-node1:9200
     networks:
       - support_net
 
@@ -54,6 +57,7 @@ services:
       - OPENSEARCH_INITIAL_ADMIN_PASSWORD=Asuadmin123!
       - plugins.security.ssl.http.enabled=false
       - plugins.security.disabled=true
+      - compatibility.override_main_response_version=true
     ulimits:
       memlock:
         soft: -1
@@ -81,6 +85,7 @@ services:
       - OPENSEARCH_INITIAL_ADMIN_PASSWORD=Asuadmin123!
       - plugins.security.ssl.http.enabled=false
       - plugins.security.disabled=true
+      - compatibility.override_main_response_version=true
     ulimits:
       memlock:
         soft: -1
@@ -155,8 +160,9 @@ services:
     environment:
       - MEDIAWIKI_URL=http://mediawiki/api.php
       - REDMINE_URL=http://redmine:3000
-      - REDMINE_API_KEY=c177337d75a1da3bb43d67ec9b9bb139b299502f
+      - REDMINE_API_KEY=e0d62b7b9695048dd4a4d44bbc9f074c865fcf2f
       - STORAGE_PATH=/app/data
+      - CORS_ORIGINS=*
     networks:
       - support_net
 

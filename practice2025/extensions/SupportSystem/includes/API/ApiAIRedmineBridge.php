@@ -4,11 +4,12 @@ namespace MediaWiki\Extension\SupportSystem\API;
 
 use ApiBase;
 use MediaWiki\Extension\SupportSystem\RedmineBridge;
+use MWException;
 
 /**
- * API module for ticket management
+ * API module for interacting with Redmine
  */
-class ApiSupportTicket extends ApiBase
+class ApiRedmineBridge extends ApiBase
 {
     /**
      * Execute the API module
@@ -22,7 +23,7 @@ class ApiSupportTicket extends ApiBase
 
         try {
             switch ($operation) {
-                case 'create':
+                case 'create_ticket':
                     $this->requirePostedParameters(['subject', 'description']);
 
                     $subject = $params['subject'];
@@ -35,59 +36,91 @@ class ApiSupportTicket extends ApiBase
                         $description,
                         $priority,
                         $assignedTo,
-                        1
+                        1  // Project ID for 'support-system'
                     );
-                    $this->getResult()->addValue(null, 'ticket', $ticket);
+
+                    $this->getResult()->addValue(null, 'redmine_result', [
+                        'success' => true,
+                        'ticket' => $ticket
+                    ]);
                     break;
-                case 'get':
+
+                case 'get_ticket':
                     $ticketId = $params['ticket_id'];
+
                     if (!$ticketId) {
                         $this->dieWithError(['apierror-invalidparameter', 'ticket_id']);
                     }
+
                     $ticket = $redmineBridge->getTicket($ticketId);
+
                     if ($ticket === null) {
-                        $this->dieWithError('supportsystem-error-ticket-not-found');
+                        $this->getResult()->addValue(null, 'redmine_result', [
+                            'success' => false,
+                            'error' => 'Ticket not found'
+                        ]);
+                    } else {
+                        $this->getResult()->addValue(null, 'redmine_result', [
+                            'success' => true,
+                            'ticket' => $ticket
+                        ]);
                     }
-                    $this->getResult()->addValue(null, 'ticket', $ticket);
                     break;
-                case 'list':
+
+                case 'list_tickets':
                     $tickets = $redmineBridge->getAllTickets();
-                    $this->getResult()->addValue(null, 'tickets', $tickets);
+                    $this->getResult()->addValue(null, 'redmine_result', [
+                        'success' => true,
+                        'tickets' => $tickets
+                    ]);
                     break;
-                case 'comment':
+
+                case 'add_comment':
                     $this->requirePostedParameters(['ticket_id', 'comment']);
+
                     $ticketId = $params['ticket_id'];
                     $comment = $params['comment'];
+
                     if (!$ticketId) {
                         $this->dieWithError(['apierror-invalidparameter', 'ticket_id']);
                     }
+
                     $success = $redmineBridge->addComment($ticketId, $comment);
-                    if (!$success) {
-                        $this->dieWithError('supportsystem-error-add-comment-failed');
-                    }
-                    $this->getResult()->addValue(null, 'result', 'success');
+
+                    $this->getResult()->addValue(null, 'redmine_result', [
+                        'success' => $success
+                    ]);
                     break;
-                case 'solution':
+
+                case 'attach_solution':
                     $this->requirePostedParameters(['ticket_id', 'solution']);
+
                     $ticketId = $params['ticket_id'];
                     $solution = $params['solution'];
                     $source = $params['source'];
+
                     if (!$ticketId) {
                         $this->dieWithError(['apierror-invalidparameter', 'ticket_id']);
                     }
+
                     $success = $redmineBridge->attachSolution($ticketId, $solution, $source);
-                    if (!$success) {
-                        $this->dieWithError('supportsystem-error-attach-solution-failed');
-                    }
-                    $this->getResult()->addValue(null, 'result', 'success');
+
+                    $this->getResult()->addValue(null, 'redmine_result', [
+                        'success' => $success
+                    ]);
                     break;
+
                 default:
                     $this->dieWithError(['apierror-invalidparameter', 'operation']);
             }
-        } catch (\Exception $e) {
-            $this->dieWithError($e->getMessage());
+        } catch (MWException $e) {
+            $this->getResult()->addValue(null, 'redmine_result', [
+                'success' => false,
+                'error' => $e->getMessage()
+            ]);
         }
     }
+
     /**
      * Get allowed parameters
      * @return array
@@ -96,7 +129,7 @@ class ApiSupportTicket extends ApiBase
     {
         return [
             'operation' => [
-                ApiBase::PARAM_TYPE => ['create', 'get', 'list', 'comment', 'solution'],
+                ApiBase::PARAM_TYPE => ['create_ticket', 'get_ticket', 'list_tickets', 'add_comment', 'attach_solution'],
                 ApiBase::PARAM_REQUIRED => true,
             ],
             'ticket_id' => [
@@ -137,12 +170,15 @@ class ApiSupportTicket extends ApiBase
     }
 
     /**
-     * Indicates this module requires write mode
+     * Indicates this module requires write mode for certain operations
      * @return bool
      */
     public function isWriteMode()
     {
         $params = $this->extractRequestParams();
-        return isset($params['operation']) && in_array($params['operation'], ['create', 'comment', 'solution']);
+        return isset($params['operation']) && in_array(
+            $params['operation'],
+            ['create_ticket', 'add_comment', 'attach_solution']
+        );
     }
 }
