@@ -23,7 +23,7 @@ class ApiSupportGraphAdmin extends ApiBase
         }
 
         $params = $this->extractRequestParams();
-        $action = $params['graphaction']; // Изменяем имя параметра
+        $action = $params['graphaction'];
 
         $graph = new DecisionGraph();
 
@@ -70,7 +70,7 @@ class ApiSupportGraphAdmin extends ApiBase
     public function getAllowedParams()
     {
         return [
-            'graphaction' => [ // Изменяем имя параметра
+            'graphaction' => [
                 ParamValidator::PARAM_TYPE => ['get', 'save'],
                 ParamValidator::PARAM_REQUIRED => true,
             ],

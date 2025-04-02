@@ -152,8 +152,6 @@ $wgCirrusSearchServers = [
 // Отключение SSL для OpenSearch
 $wgCirrusSearchUseSSL = false;
 $wgCirrusSearchUseOpenSearch = true;
-$wgHooks['CirrusSearchAlterQueryBuilder'][] = 'MediaWiki\Extension\SupportSystem\CirrusSearchAIHook::onCirrusSearchAlterQueryBuilder';
-$wgHooks['CirrusSearchResults'][] = 'MediaWiki\Extension\SupportSystem\CirrusSearchAIHook::onCirrusSearchResults';
 $wgAPIModules['unifiedsearch'] = 'MediaWiki\Extension\SupportSystem\API\ApiUnifiedSearch';
 $wgSupportSystemAIServiceURL = 'http://ai-service:5000';
 

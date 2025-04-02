@@ -36,18 +36,10 @@
         },
         "unifiedsearch": {
             "class": "MediaWiki\\Extension\\SupportSystem\\API\\ApiUnifiedSearch"
-        },
-        "aibridge": {
-            "class": "MediaWiki\\Extension\\SupportSystem\\API\\ApiAIBridge"
-        },
-        "redminebridge": {
-            "class": "MediaWiki\\Extension\\SupportSystem\\API\\ApiRedmineBridge"
         }
     },
     "Hooks": {
-        "BeforePageDisplay": "MediaWiki\\Extension\\SupportSystem\\Hooks::onBeforePageDisplay",
-        "CirrusSearchAlterQueryBuilder": "MediaWiki\\Extension\\SupportSystem\\CirrusSearchAIHook::onCirrusSearchAlterQueryBuilder",
-        "CirrusSearchResults": "MediaWiki\\Extension\\SupportSystem\\CirrusSearchAIHook::onCirrusSearchResults"
+        "BeforePageDisplay": "MediaWiki\\Extension\\SupportSystem\\Hooks::onBeforePageDisplay"
     },
     "ResourceModules": {
         "ext.supportSystem.styles": {

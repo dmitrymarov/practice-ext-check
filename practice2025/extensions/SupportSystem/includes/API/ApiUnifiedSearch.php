@@ -3,8 +3,9 @@
 namespace MediaWiki\Extension\SupportSystem\API;
 
 use ApiBase;
-use MediaWiki\Extension\SupportSystem\AISearchBridge;
-use MediaWiki\Extension\SupportSystem\SearchModule;
+use CirrusSearch\CirrusSearch;
+use MediaWiki\MediaWikiServices;
+use Http;
 use Exception;
 
 /**
@@ -12,79 +13,197 @@ use Exception;
  */
 class ApiUnifiedSearch extends ApiBase
 {
+    /**
+     * Выполнение API-запроса
+     */
     public function execute()
     {
         try {
+            // Получение параметров
             $params = $this->extractRequestParams();
             $query = $params['query'];
             $useAI = $params['use_ai'];
             $context = $params['context'] ? json_decode($params['context'], true) : [];
             $limit = $params['limit'];
             $sources = $params['sources'];
-            $searchMethods = [];
-            if (in_array('opensearch', $sources)) {
-                $searchMethods[] = 'opensearch';
-            }
-            if (in_array('mediawiki', $sources)) {
-                $searchMethods[] = 'cirrus';
-            }
+
+            // Подготовка результатов
             $results = [
                 'cirrus' => [],
                 'opensearch' => [],
                 'ai' => null
             ];
-            $userId = null;
-            if ($useAI) {
-                $user = $this->getUser();
-                if ($user && !$user->isAnon()) {
-                    $userId = 'user_' . $user->getId();
-                } else {
-                    $session = $this->getRequest()->getSession();
-                    if ($session) {
-                        $userId = 'anon_' . $session->getId();
+
+            // Выполнение поиска в CirrusSearch
+            if (in_array('mediawiki', $sources)) {
+                try {
+                    $searchEngineFactory = MediaWikiServices::getInstance()->getSearchEngineFactory();
+                    $searchEngine = $searchEngineFactory->create();
+
+                    // Проверка, что используется CirrusSearch
+                    if ($searchEngine instanceof CirrusSearch) {
+                        $matches = $searchEngine->searchText($query, ['limit' => $limit]);
+
+                        if ($matches) {
+                            foreach ($matches as $match) {
+                                $title = $match->getTitle();
+                                $snippet = $match->getTextSnippet();
+
+                                $results['cirrus'][] = [
+                                    'id' => $title->getArticleID(),
+                                    'title' => $title->getText(),
+                                    'content' => $snippet,
+                                    'score' => $match->getScore(),
+                                    'source' => 'mediawiki',
+                                    'url' => $title->getFullURL()
+                                ];
+                            }
+                        }
                     }
+                } catch (Exception $e) {
+                    $this->addWarning('cirrus_search_error', $e->getMessage());
                 }
             }
-            $searchModule = new SearchModule();
-            $searchResult = $searchModule->comprehensiveSearch($query, $searchMethods, $context, $userId);
-            foreach ($searchResult['results'] as $result) {
-                if ($result['source'] === 'cirrus') {
-                    $results['cirrus'][] = $result;
-                } elseif ($result['source'] === 'opensearch') {
-                    $results['opensearch'][] = $result;
+
+            // Выполнение поиска в OpenSearch
+            if (in_array('opensearch', $sources)) {
+                try {
+                    $config = MediaWikiServices::getInstance()->getMainConfig();
+                    $host = $config->get('SupportSystemOpenSearchHost');
+                    $port = $config->get('SupportSystemOpenSearchPort');
+                    $indexName = $config->get('SupportSystemOpenSearchIndex');
+
+                    $url = "http://{$host}:{$port}/{$indexName}/_search";
+
+                    $requestData = [
+                        'query' => [
+                            'multi_match' => [
+                                'query' => $query,
+                                'fields' => ['title^2', 'content', 'tags^1.5'],
+                                'type' => 'best_fields'
+                            ]
+                        ],
+                        'highlight' => [
+                            'fields' => [
+                                'content' => new \stdClass()
+                            ]
+                        ],
+                        'size' => $limit
+                    ];
+
+                    $options = [
+                        'method' => 'POST',
+                        'timeout' => 10,
+                        'postData' => json_encode($requestData),
+                        'headers' => [
+                            'Content-Type' => 'application/json'
+                        ]
+                    ];
+
+                    $response = Http::request($url, $options);
+
+                    if ($response !== false) {
+                        $data = json_decode($response, true);
+
+                        if (isset($data['hits']['hits'])) {
+                            foreach ($data['hits']['hits'] as $hit) {
+                                $source = $hit['_source'];
+                                $result = [
+                                    'id' => $source['id'] ?? $hit['_id'],
+                                    'title' => $source['title'] ?? 'Untitled',
+                                    'content' => $source['content'] ?? '',
+                                    'score' => $hit['_score'],
+                                    'source' => 'opensearch',
+                                    'url' => $source['url'] ?? ''
+                                ];
+
+                                if (isset($hit['highlight']['content'])) {
+                                    $result['highlight'] = $hit['highlight']['content'][0];
+                                }
+
+                                if (isset($source['tags'])) {
+                                    $result['tags'] = $source['tags'];
+                                }
+
+                                $results['opensearch'][] = $result;
+                            }
+                        }
+                    }
+                } catch (Exception $e) {
+                    $this->addWarning('opensearch_error', $e->getMessage());
                 }
             }
+
+            // Выполнение AI-поиска
             if ($useAI) {
                 try {
-                    $aiBridge = new AISearchBridge();
-                    $results['ai'] = $aiBridge->search($query, $context, $userId);
+                    $config = MediaWikiServices::getInstance()->getMainConfig();
+                    $aiServiceUrl = $config->get('SupportSystemAIServiceURL');
+
+                    // Получаем ID пользователя
+                    $userId = null;
+                    $user = $this->getUser();
+                    if ($user && !$user->isAnon()) {
+                        $userId = 'user_' . $user->getId();
+                    } else {
+                        // Для анонимных пользователей, используем ID сессии
+                        $session = $this->getRequest()->getSession();
+                        if ($session) {
+                            $userId = 'anon_' . $session->getId();
+                        }
+                    }
+
+                    $requestData = [
+                        'query' => $query,
+                        'context' => $context
+                    ];
+
+                    if ($userId) {
+                        $requestData['user_id'] = $userId;
+                    }
+
+                    $url = rtrim($aiServiceUrl, '/') . "/api/search_ai";
+
+                    $options = [
+                        'method' => 'POST',
+                        'timeout' => 30,
+                        'postData' => json_encode($requestData),
+                        'headers' => [
+                            'Content-Type' => 'application/json'
+                        ]
+                    ];
+
+                    $response = Http::request($url, $options);
+
+                    if ($response !== false) {
+                        $data = json_decode($response, true);
+                        $results['ai'] = [
+                            'answer' => $data['answer'] ?? 'Ответ не получен',
+                            'sources' => $data['sources'] ?? [],
+                            'success' => $data['success'] ?? false
+                        ];
+                    }
                 } catch (Exception $e) {
                     $this->addWarning('ai_search_error', $e->getMessage());
                     $results['ai'] = [
-                        'answer' => 'Произошла ошибка при выполнении интеллектуального поиска. Пожалуйста, попробуйте снова позже.',
+                        'answer' => 'Произошла ошибка при выполнении поиска',
                         'sources' => [],
                         'success' => false
                     ];
                 }
             }
-            $debugInfo = [
-                'query' => $query,
-                'searchMethods' => $searchMethods,
-                'resultCount' => [
-                    'cirrus' => count($results['cirrus']),
-                    'opensearch' => count($results['opensearch']),
-                    'ai' => $useAI ? 1 : 0
-                ],
-                'searchTime' => $searchResult['debug']['totalTime'] ?? 0
-            ];
+
+            // Возвращаем результаты
             $this->getResult()->addValue(null, 'results', $results);
-            $this->getResult()->addValue(null, 'debug', $debugInfo);
 
         } catch (Exception $e) {
+            // В случае ошибки возвращаем структурированный ответ
             $this->getResult()->addValue(null, 'error', [
                 'code' => 'search_error',
                 'info' => $e->getMessage()
             ]);
+
+            // Добавляем пустые результаты для совместимости
             $this->getResult()->addValue(null, 'results', [
                 'cirrus' => [],
                 'opensearch' => [],
@@ -92,6 +211,10 @@ class ApiUnifiedSearch extends ApiBase
             ]);
         }
     }
+
+    /**
+     * Получение разрешенных параметров
+     */
     public function getAllowedParams()
     {
         return [
@@ -120,6 +243,10 @@ class ApiUnifiedSearch extends ApiBase
             ],
         ];
     }
+
+    /**
+     * Примеры для документации API
+     */
     public function getExamplesMessages()
     {
         return [
