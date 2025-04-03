@@ -974,19 +974,23 @@ var selectedSource = '';
         }
     }
     /**
-     * Function for uploading a file to the ticket
-     */
+ * Function for uploading a file to the ticket
+ */
     function uploadFileToTicket() {
         var ticketId = $('#support-ticket-details').data('ticket-id');
         var fileInput = $('#support-file-input')[0];
         var comment = $('#support-file-comment').val();
+
         if (!fileInput.files || fileInput.files.length === 0) {
             mw.notify('Пожалуйста, выберите файл для загрузки', { type: 'error' });
             return;
         }
+
         var file = fileInput.files[0];
         $('#support-file-upload-form').hide();
         $('#support-file-upload-progress').show();
+
+        // Step 1: Upload the file to Redmine and get a token
         var formData = new FormData();
         formData.append('filename', file.name);
         var uploadCommand = "curl -s -X POST " +

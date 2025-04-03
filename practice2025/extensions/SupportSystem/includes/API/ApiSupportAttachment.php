@@ -8,12 +8,12 @@ use MWException;
 use Wikimedia\ParamValidator\ParamValidator;
 
 /**
- * API module for file attachments
+ * API модуль для загрузки файлов в тикеты
  */
 class ApiSupportAttachment extends ApiBase
 {
     /**
-     * Execute the API module
+     * Выполнение API модуля
      */
     public function execute()
     {
@@ -26,22 +26,28 @@ class ApiSupportAttachment extends ApiBase
                 case 'upload':
                     $this->requirePostedParameters(['ticket_id']);
                     $request = $this->getRequest();
+                    $ticketId = $params['ticket_id'];
+                    $comment = $params['comment'];
                     if (!$request->getUpload('file')) {
                         $this->dieWithError('No file uploaded', 'no_file');
                     }
+
                     $tmpName = $request->getFileTempname('file');
                     $originalName = $request->getFileName('file');
                     $fileSize = $request->getFileSize('file');
                     $fileType = $request->getUploadMimeType('file');
+
                     if (!$tmpName || !$originalName) {
                         $this->dieWithError('Invalid file upload', 'invalid_file');
                     }
+
                     if ($fileSize <= 0) {
                         $this->dieWithError('Empty file uploaded', 'empty_file');
                     }
-                    $ticketId = $params['ticket_id'];
-                    $comment = $params['comment'];
+
+                    // Загрузка файла в Redmine
                     try {
+                        // Вызываем упрощенный метод для загрузки и прикрепления файла к тикету
                         $result = $serviceDesk->attachFileToTicket(
                             $ticketId,
                             $tmpName,
@@ -49,6 +55,7 @@ class ApiSupportAttachment extends ApiBase
                             $fileType,
                             $comment
                         );
+
                         if ($result) {
                             $this->getResult()->addValue(null, 'result', 'success');
                             $this->getResult()->addValue(null, 'message', 'File attached successfully');
@@ -59,6 +66,7 @@ class ApiSupportAttachment extends ApiBase
                         $this->dieWithError($e->getMessage(), 'attach_error');
                     }
                     break;
+
                 default:
                     $this->dieWithError(['apierror-invalidparameter', 'operation']);
             }
@@ -66,8 +74,9 @@ class ApiSupportAttachment extends ApiBase
             $this->dieWithError($e->getMessage(), 'api_error');
         }
     }
+
     /**
-     * Get allowed parameters
+     * Получение допустимых параметров
      * @return array
      */
     public function getAllowedParams()
@@ -84,20 +93,22 @@ class ApiSupportAttachment extends ApiBase
             'comment' => [
                 ParamValidator::PARAM_TYPE => 'string',
                 ParamValidator::PARAM_REQUIRED => false,
-                ParamValidator::PARAM_DEFAULT => 'File attached',
+                ParamValidator::PARAM_DEFAULT => 'Файл прикреплен',
             ],
         ];
     }
+
     /**
-     * Indicates this module requires write mode
+     * Указывает, что этот модуль требует режима записи
      * @return bool
      */
     public function isWriteMode()
     {
         return true;
     }
+
     /**
-     * Indicates whether this module requires upload
+     * Указывает, что этот модуль требует использования POST
      * @return bool
      */
     public function mustBePosted()
