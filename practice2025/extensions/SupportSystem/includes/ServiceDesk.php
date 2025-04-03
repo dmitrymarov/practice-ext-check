@@ -34,20 +34,21 @@ class ServiceDesk
     }
 
     /**
-     * Create a ticket in Redmine
+     * Create a ticket in Redmine using direct curl
      * 
      * @param string $subject Ticket subject
      * @param string $description Ticket description
-     * @param string $priority Ticket priority ('low', 'normal', 'high', 'urgent')
+     * @param string $priority Ticket priority ('red', 'orange', 'yellow', 'green')
      * @param int|null $assignedTo User ID to assign the ticket to
      * @param int $projectId Project ID
      * @return array The created ticket
      * @throws MWException When ticket creation fails
      */
-    public function createTicket(string $subject, string $description, string $priority = 'normal', int $assignedTo = null, int $projectId = 1): array
+    public function createTicket(string $subject, string $description, string $priority = 'yellow', int $assignedTo = null, int $projectId = 1): array
     {
         wfDebugLog('SupportSystem', "Creating ticket: '$subject', priority: $priority");
         $priorityId = $this->getPriorityId($priority);
+
         $issueData = [
             'issue' => [
                 'subject' => $subject,
@@ -58,43 +59,43 @@ class ServiceDesk
                 'status_id' => 1
             ]
         ];
+
         if ($assignedTo) {
             $issueData['issue']['assigned_to_id'] = $assignedTo;
         }
+
         $url = rtrim($this->apiUrl, '/') . "/issues.json";
         wfDebugLog('SupportSystem', "Request URL: $url");
         wfDebugLog('SupportSystem', "Request data: " . json_encode($issueData));
-        $options = [
-            'method' => 'POST',
-            'timeout' => 30,
-            'postData' => json_encode($issueData),
-            'headers' => [
-                'Content-Type' => 'application/json',
-                'X-Redmine-API-Key' => $this->apiKey
-            ],
-            'followRedirects' => true,
-            'sslVerifyCert' => false
-        ];
+
         $attempts = 0;
         $lastError = null;
+
         while ($attempts < $this->maxRetryAttempts) {
             try {
-                wfDebugLog('SupportSystem', "Attempt " . ($attempts + 1) . " to create ticket");
-                $response = Http::request($url, $options);
-                $statusCode = Http::getLastStatusCode();
-                wfDebugLog('SupportSystem', "Response status: $statusCode");
-                if ($response) {
-                    wfDebugLog('SupportSystem', "Response body (first 500 chars): " . substr($response, 0, 500));
-                } else {
-                    wfDebugLog('SupportSystem', "Empty response received");
+                wfDebugLog('SupportSystem', "Attempt " . ($attempts + 1) . " to create ticket using curl");
+
+                // Формируем curl запрос
+                $jsonData = json_encode($issueData);
+                $command = "curl -s -X POST \"$url\" " .
+                    "-H \"Content-Type: application/json\" " .
+                    "-H \"X-Redmine-API-Key: {$this->apiKey}\" " .
+                    "-d '" . addslashes($jsonData) . "'";
+
+                wfDebugLog('SupportSystem', "Executing curl command: $command");
+                $response = shell_exec($command);
+                wfDebugLog('SupportSystem', "Response: " . substr($response, 0, 500));
+
+                if (!$response) {
+                    throw new MWException("Empty response from Redmine API");
                 }
-                if ($statusCode >= 400) {
-                    throw new MWException("Redmine API error: Status $statusCode - Response: $response");
-                }
+
                 $data = json_decode($response, true);
+
                 if (!isset($data['issue'])) {
                     throw new MWException("Invalid response format from Redmine API: " . substr($response, 0, 200));
                 }
+
                 wfDebugLog('SupportSystem', "Ticket created successfully, ID: " . $data['issue']['id']);
                 return $data['issue'];
             } catch (MWException $e) {
@@ -108,6 +109,7 @@ class ServiceDesk
                 }
             }
         }
+
         throw new MWException("Failed to create ticket after {$this->maxRetryAttempts} attempts: " .
             ($lastError ? $lastError->getMessage() : "Unknown error"));
     }
@@ -122,12 +124,14 @@ class ServiceDesk
     {
         // Приоритеты в Redmine
         $priorities = [
-            'Red' => 1,
-            'Yellow' => 2,
-            'Green' => 3
+            'red' => 1,     // Высший приоритет
+            'orange' => 2,  // Высокий приоритет
+            'yellow' => 3,  // Нормальный приоритет
+            'green' => 4    // Низкий приоритет
         ];
 
-        return $priorities[strtolower($priorityName)] ?? 2; // По умолчанию Normal
+        $priorityName = strtolower($priorityName);
+        return $priorities[$priorityName] ?? 3; // По умолчанию Yellow (нормальный)
     }
 
     /**
@@ -139,26 +143,15 @@ class ServiceDesk
     public function getTicket(int $ticketId): ?array
     {
         wfDebugLog('SupportSystem', "Getting ticket #$ticketId");
-
-        // Формируем URL согласно документации Redmine API
         $url = rtrim($this->apiUrl, '/') . "/issues/{$ticketId}.json?include=journals";
 
-        $options = [
-            'method' => 'GET',
-            'timeout' => 30,
-            'headers' => [
-                'X-Redmine-API-Key' => $this->apiKey
-            ],
-            'followRedirects' => true,
-            'sslVerifyCert' => false
-        ];
-
         try {
-            $response = Http::request($url, $options);
-            $statusCode = Http::getLastStatusCode();
+            $command = "curl -s -H \"X-Redmine-API-Key: {$this->apiKey}\" \"$url\"";
+            wfDebugLog('SupportSystem', "Executing command: $command");
+            $response = shell_exec($command);
 
-            if ($response === false || $statusCode >= 400) {
-                wfDebugLog('SupportSystem', "Error getting ticket #$ticketId: status $statusCode");
+            if (!$response) {
+                wfDebugLog('SupportSystem', "Error getting ticket #$ticketId: empty response");
                 return null;
             }
 
@@ -170,8 +163,7 @@ class ServiceDesk
 
             wfDebugLog('SupportSystem', "Successfully got ticket #$ticketId");
             return $data['issue'];
-
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             wfDebugLog('SupportSystem', "Exception getting ticket #$ticketId: " . $e->getMessage());
             return null;
         }
@@ -187,37 +179,36 @@ class ServiceDesk
     public function addComment(int $ticketId, string $comment): bool
     {
         wfDebugLog('SupportSystem', "Adding comment to ticket #$ticketId");
+
         $issueData = [
             'issue' => [
                 'notes' => $comment
             ]
         ];
+
         $url = rtrim($this->apiUrl, '/') . "/issues/{$ticketId}.json";
-        $options = [
-            'method' => 'PUT',
-            'timeout' => 30,
-            'postData' => json_encode($issueData),
-            'headers' => [
-                'Content-Type' => 'application/json',
-                'X-Redmine-API-Key' => $this->apiKey
-            ],
-            'followRedirects' => true,
-            'sslVerifyCert' => false
-        ];
 
         try {
-            $response = Http::request($url, $options);
-            $statusCode = Http::getLastStatusCode();
+            $jsonData = json_encode($issueData);
+            $command = "curl -s -X PUT \"$url\" " .
+                "-H \"Content-Type: application/json\" " .
+                "-H \"X-Redmine-API-Key: {$this->apiKey}\" " .
+                "-d '" . addslashes($jsonData) . "'";
 
-            if ($response === false || $statusCode >= 400) {
-                wfDebugLog('SupportSystem', "Error adding comment to ticket #$ticketId: status $statusCode");
+            wfDebugLog('SupportSystem', "Executing command: $command");
+            $response = shell_exec($command);
+            $exitCode = shell_exec("echo $?");
+
+            wfDebugLog('SupportSystem', "Command exit code: $exitCode");
+
+            if ($exitCode != '0') {
+                wfDebugLog('SupportSystem', "Error adding comment to ticket #$ticketId: non-zero exit code");
                 return false;
             }
 
             wfDebugLog('SupportSystem', "Comment added to ticket #$ticketId");
             return true;
-
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             wfDebugLog('SupportSystem', "Exception adding comment: " . $e->getMessage());
             return false;
         }
@@ -234,30 +225,26 @@ class ServiceDesk
     {
         wfDebugLog('SupportSystem', "Getting all tickets (limit: $limit, offset: $offset)");
         $url = rtrim($this->apiUrl, '/') . "/issues.json?limit=$limit&offset=$offset";
-        $options = [
-            'method' => 'GET',
-            'timeout' => 30,
-            'headers' => [
-                'X-Redmine-API-Key' => $this->apiKey
-            ],
-            'followRedirects' => true,
-            'sslVerifyCert' => false
-        ];
+
         try {
-            $response = Http::request($url, $options);
-            $statusCode = Http::getLastStatusCode();
-            if ($response === false || $statusCode >= 400) {
-                wfDebugLog('SupportSystem', "Error getting tickets: status $statusCode");
+            $command = "curl -s -H \"X-Redmine-API-Key: {$this->apiKey}\" \"$url\"";
+            wfDebugLog('SupportSystem', "Executing command: $command");
+            $response = shell_exec($command);
+
+            if (!$response) {
+                wfDebugLog('SupportSystem', "Error getting tickets: empty response");
                 return [];
             }
+
             $data = json_decode($response, true);
             if (!isset($data['issues'])) {
                 wfDebugLog('SupportSystem', "Invalid response format for tickets list");
                 return [];
             }
+
             wfDebugLog('SupportSystem', "Got " . count($data['issues']) . " tickets");
             return $data['issues'];
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             wfDebugLog('SupportSystem', "Exception getting tickets: " . $e->getMessage());
             return [];
         }
@@ -274,7 +261,6 @@ class ServiceDesk
     public function attachSolution(int $ticketId, string $solutionText, string $source = 'unknown'): bool
     {
         wfDebugLog('SupportSystem', "Attaching solution to ticket #$ticketId");
-
         $comment = "Найденное решение: {$solutionText}\n\nИсточник: {$source}";
         return $this->addComment($ticketId, $comment);
     }

@@ -674,8 +674,29 @@ var selectedSource = '';
         $('#support-ticket-status').text(statusName)
             .removeClass()
             .addClass(statusClass);
-        var priorityName = ((ticket.priority || {}).name || 'Normal');
-        var priorityClass = 'support-priority-' + priorityName.toLowerCase().replace(' ', '-');
+        var priorityName = ((ticket.priority || {}).name || 'Yellow');
+        var displayPriorityName = '';
+        switch (priorityName.toLowerCase()) {
+            case 'red':
+                displayPriorityName = 'Красный (критический)';
+                priorityClass = 'support-priority-red';
+                break;
+            case 'orange':
+                displayPriorityName = 'Оранжевый (высокий)';
+                priorityClass = 'support-priority-orange';
+                break;
+            case 'yellow':
+                displayPriorityName = 'Желтый (нормальный)';
+                priorityClass = 'support-priority-yellow';
+                break;
+            case 'green':
+                displayPriorityName = 'Зеленый (низкий)';
+                priorityClass = 'support-priority-green';
+                break;
+            default:
+                displayPriorityName = priorityName;
+                priorityClass = 'support-priority-yellow';
+        }
         $('#support-ticket-priority-value').text(priorityName)
             .removeClass()
             .addClass(priorityClass);
@@ -742,28 +763,37 @@ var selectedSource = '';
         }
         $('#support-ticket-form').show();
     }
+
+    /**
+     * Отправка формы заявки
+     */
     function submitTicket() {
         var api = new mw.Api();
         var subject = $('#support-ticket-subject').val();
         var description = $('#support-ticket-description').val();
         var priority = $('#support-ticket-priority').val();
+
         if (!subject) {
             mw.notify(getMessage('supportsystem-sd-ticket-subject-required', 'Ticket subject is required'), { type: 'error' });
             $('#support-ticket-subject').focus();
             return;
         }
+
         if (!description) {
             mw.notify(getMessage('supportsystem-sd-ticket-description-required', 'Problem description is required'), { type: 'error' });
             $('#support-ticket-description').focus();
             return;
         }
+
         $('#support-ticket-submit').prop('disabled', true);
         $('#support-ticket-submit').text(getMessage('supportsystem-dt-submitting', 'Submitting...'));
+
         console.log('Отправка запроса на создание тикета:', {
             subject: subject,
             priority: priority,
             description_length: description.length
         });
+
         api.post({
             action: 'supportticket',
             operation: 'create',
@@ -772,9 +802,13 @@ var selectedSource = '';
             priority: priority
         }).done(function (data) {
             console.log('Ответ API на создание тикета:', data);
+
             if (data.ticket) {
-                if (selectedSolution) { attachSolution(data.ticket.id); } 
-                else { showTicketSuccess(data.ticket.id); }
+                if (selectedSolution) {
+                    attachSolution(data.ticket.id);
+                } else {
+                    showTicketSuccess(data.ticket.id);
+                }
             } else {
                 console.error('Ошибка создания тикета:', data);
                 mw.notify(getMessage('supportsystem-search-ticket-error', 'Error creating ticket'),
@@ -793,8 +827,13 @@ var selectedSource = '';
             try {
                 if (xhr.responseJSON && xhr.responseJSON.error) {
                     errorMsg = xhr.responseJSON.error.info || status || 'Unknown error';
-                } else { errorMsg = status || 'Unknown error'; }
-            } catch (e) { errorMsg = 'Error parsing response'; }
+                } else {
+                    errorMsg = status || 'Unknown error';
+                }
+            } catch (e) {
+                errorMsg = 'Error parsing response';
+            }
+
             mw.notify(getMessage('supportsystem-search-ticket-error', 'Error creating ticket') +
                 ': ' + errorMsg, { type: 'error' });
             $('#support-ticket-submit').prop('disabled', false);

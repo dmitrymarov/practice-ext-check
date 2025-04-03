@@ -13,6 +13,7 @@ services:
       - mediawiki_data:/var/www/html/images
       - ./extensions:/var/www/html/extensions
       - ./LocalSettings.php:/var/www/html/LocalSettings.php
+      - ./scripts/:/var/www/html/scripts
     environment:
       - MEDIAWIKI_DB_HOST=database
       - MEDIAWIKI_DB_PORT=3306

@@ -116,10 +116,10 @@ class SpecialUnifiedSupport extends SpecialPage
                 <div class="support-form-group">
                     <label for="support-ticket-priority">{$this->msg('supportsystem-dt-ticket-priority')->escaped()}</label>
                     <select id="support-ticket-priority" class="support-select">
-                        <option value="low">{$this->msg('supportsystem-dt-priority-low')->escaped()}</option>
-                        <option value="normal" selected>{$this->msg('supportsystem-dt-priority-normal')->escaped()}</option>
-                        <option value="high">{$this->msg('supportsystem-dt-priority-high')->escaped()}</option>
-                        <option value="urgent">{$this->msg('supportsystem-dt-priority-urgent')->escaped()}</option>
+                        <option value="green">{$this->msg('supportsystem-dt-priority-low')->escaped()}</option>
+                        <option value="yellow" selected>{$this->msg('supportsystem-dt-priority-normal')->escaped()}</option>
+                        <option value="orange">{$this->msg('supportsystem-dt-priority-high')->escaped()}</option>
+                        <option value="red">{$this->msg('supportsystem-dt-priority-urgent')->escaped()}</option>
                     </select>
                 </div>
                 <div class="support-form-actions">
@@ -332,6 +332,10 @@ HTML;
         return $html;
     }
 
+    /**
+     * Create HTML for the ticket form
+     * @return string HTML
+     */
     private function createTicketForm(): string
     {
         $html = <<<HTML
@@ -358,10 +362,10 @@ HTML;
             <div class="support-form-group">
                 <label id="support-ticket-priority-label" for="support-ticket-priority">{$this->msg('supportsystem-dt-ticket-priority')->escaped()}</label>
                 <select id="support-ticket-priority" class="support-select">
-                    <option value="low">{$this->msg('supportsystem-dt-priority-low')->escaped()}</option>
-                    <option value="normal" selected>{$this->msg('supportsystem-dt-priority-normal')->escaped()}</option>
-                    <option value="high">{$this->msg('supportsystem-dt-priority-high')->escaped()}</option>
-                    <option value="urgent">{$this->msg('supportsystem-dt-priority-urgent')->escaped()}</option>
+                    <option value="green">Зеленый (низкий)</option>
+                    <option value="yellow" selected>Желтый (нормальный)</option>
+                    <option value="orange">Оранжевый (высокий)</option>
+                    <option value="red">Красный (критический)</option>
                 </select>
             </div>
             <div class="support-form-actions">

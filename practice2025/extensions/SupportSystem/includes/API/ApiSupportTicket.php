@@ -8,10 +8,6 @@ use MWException;
 
 /**
  * API module for ticket management
- * 
- * Этот модуль предоставляет API для работы с тикетами через MediaWiki.
- * Он является тонкой оболочкой вокруг класса ServiceDesk,
- * добавляя проверку параметров и обработку ошибок в стиле MediaWiki.
  */
 class ApiSupportTicket extends ApiBase
 {
@@ -35,7 +31,8 @@ class ApiSupportTicket extends ApiBase
                     $description = $params['description'];
                     $priority = $params['priority'];
                     $assignedTo = $params['assigned_to'] ?? null;
-                    wfDebugLog('SupportSystem', "API: создание тикета: $subject");
+                    wfDebugLog('SupportSystem', "API: создание тикета: $subject, приоритет: $priority");
+
                     try {
                         $ticket = $serviceDesk->createTicket(
                             $subject,
@@ -55,6 +52,7 @@ class ApiSupportTicket extends ApiBase
                     if (!$ticketId) {
                         $this->dieWithError(['apierror-invalidparameter', 'ticket_id']);
                     }
+
                     $ticket = $serviceDesk->getTicket($ticketId);
                     if ($ticket) {
                         $this->getResult()->addValue(null, 'ticket', $ticket);
@@ -74,9 +72,11 @@ class ApiSupportTicket extends ApiBase
                     $this->requirePostedParameters(['ticket_id', 'comment']);
                     $ticketId = $params['ticket_id'];
                     $comment = $params['comment'];
+
                     if (!$ticketId) {
                         $this->dieWithError(['apierror-invalidparameter', 'ticket_id']);
                     }
+
                     $success = $serviceDesk->addComment($ticketId, $comment);
                     if ($success) {
                         $this->getResult()->addValue(null, 'result', 'success');
@@ -84,6 +84,7 @@ class ApiSupportTicket extends ApiBase
                         $this->dieWithError('supportsystem-error-add-comment-failed');
                     }
                     break;
+
                 case 'solution':
                     $this->requirePostedParameters(['ticket_id', 'solution']);
                     $ticketId = $params['ticket_id'];
@@ -93,6 +94,7 @@ class ApiSupportTicket extends ApiBase
                     if (!$ticketId) {
                         $this->dieWithError(['apierror-invalidparameter', 'ticket_id']);
                     }
+
                     $success = $serviceDesk->attachSolution($ticketId, $solution, $source);
                     if ($success) {
                         $this->getResult()->addValue(null, 'result', 'success');
@@ -134,8 +136,8 @@ class ApiSupportTicket extends ApiBase
                 ApiBase::PARAM_REQUIRED => false,
             ],
             'priority' => [
-                ApiBase::PARAM_TYPE => ['low', 'normal', 'high', 'urgent'],
-                ApiBase::PARAM_DFLT => 'normal',
+                ApiBase::PARAM_TYPE => ['green', 'yellow', 'orange', 'red'],
+                ApiBase::PARAM_DFLT => 'yellow',
                 ApiBase::PARAM_REQUIRED => false,
             ],
             'assigned_to' => [
@@ -169,35 +171,5 @@ class ApiSupportTicket extends ApiBase
                 ApiBase::PARAM_REQUIRED => false,
             ],
         ];
-    }
-
-    /**
-     * Examples for the API documentation
-     * @return array
-     */
-    public function getExamplesMessages()
-    {
-        return [
-            'action=supportticket&operation=create&subject=Test%20subject&description=Test%20description&priority=normal'
-            => 'apihelp-supportticket-example-1',
-            'action=supportticket&operation=get&ticket_id=1'
-            => 'apihelp-supportticket-example-2',
-            'action=supportticket&operation=list&limit=10'
-            => 'apihelp-supportticket-example-3',
-            'action=supportticket&operation=comment&ticket_id=1&comment=Test%20comment'
-            => 'apihelp-supportticket-example-4',
-            'action=supportticket&operation=solution&ticket_id=1&solution=Problem%20solved&source=Knowledge%20Base'
-            => 'apihelp-supportticket-example-5',
-        ];
-    }
-
-    /**
-     * Indicates this module requires write mode
-     * @return bool
-     */
-    public function isWriteMode()
-    {
-        $params = $this->extractRequestParams();
-        return isset($params['operation']) && in_array($params['operation'], ['create', 'comment', 'solution']);
     }
 }
