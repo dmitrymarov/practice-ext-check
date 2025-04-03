@@ -7,8 +7,6 @@ use MWException;
 
 /**
  * Class for integration with Redmine (Service Desk)
- * 
- * Этот класс реализует интеграцию MediaWiki с API Redmine для управления тикетами.
  */
 class ServiceDesk
 {
