@@ -179,33 +179,21 @@ class ServiceDesk
     public function addComment(int $ticketId, string $comment): bool
     {
         wfDebugLog('SupportSystem', "Adding comment to ticket #$ticketId");
-
         $issueData = [
             'issue' => [
                 'notes' => $comment
             ]
         ];
-
         $url = rtrim($this->apiUrl, '/') . "/issues/{$ticketId}.json";
-
         try {
             $jsonData = json_encode($issueData);
-            $command = "curl -s -X PUT \"$url\" " .
-                "-H \"Content-Type: application/json\" " .
-                "-H \"X-Redmine-API-Key: {$this->apiKey}\" " .
-                "-d '" . addslashes($jsonData) . "'";
-
-            wfDebugLog('SupportSystem', "Executing command: $command");
+            $command = "curl -s -X PUT \"$url\" -H \"Content-Type: application/json\" -H \"X-Redmine-API-Key: {$this->apiKey}\" -d .addslashes($jsonData)";
             $response = shell_exec($command);
             $exitCode = shell_exec("echo $?");
-
-            wfDebugLog('SupportSystem', "Command exit code: $exitCode");
-
             if ($exitCode != '0') {
                 wfDebugLog('SupportSystem', "Error adding comment to ticket #$ticketId: non-zero exit code");
                 return false;
             }
-
             wfDebugLog('SupportSystem', "Comment added to ticket #$ticketId");
             return true;
         } catch (\Exception $e) {
@@ -213,7 +201,6 @@ class ServiceDesk
             return false;
         }
     }
-
     /**
      * Get all tickets
      * 

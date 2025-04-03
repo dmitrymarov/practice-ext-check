@@ -122,7 +122,11 @@
                 "supportsystem-attachment-upload",
                 "supportsystem-attachment-add",
                 "supportsystem-attachment-error",
-                "supportsystem-attachment-success"
+                "supportsystem-attachment-success",
+                "supportsystem-sd-ticket-comment-placeholder",
+                "supportsystem-sd-ticket-no-comments",
+                "supportsystem-sd-ticket-add-comment",
+                "supportsystem-sd-ticket-comment-submit"
             ]
         },
         "ext.supportSystem.graphAdmin": {

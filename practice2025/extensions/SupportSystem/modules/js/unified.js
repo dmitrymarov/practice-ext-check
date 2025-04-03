@@ -974,62 +974,62 @@ var selectedSource = '';
         }
     }
     /**
- * Функция для загрузки файла к тикету
- */
+     * Function for uploading a file to the ticket
+     */
     function uploadFileToTicket() {
         var ticketId = $('#support-ticket-details').data('ticket-id');
         var fileInput = $('#support-file-input')[0];
         var comment = $('#support-file-comment').val();
         if (!fileInput.files || fileInput.files.length === 0) {
-            mw.notify(mw.msg('supportsystem-attachment-error') || 'Please select a file to upload', { type: 'error' });
+            mw.notify('Пожалуйста, выберите файл для загрузки', { type: 'error' });
             return;
         }
         var file = fileInput.files[0];
         $('#support-file-upload-form').hide();
         $('#support-file-upload-progress').show();
         var formData = new FormData();
-        formData.append('action', 'supportattachment');
-        formData.append('operation', 'upload');
-        formData.append('ticket_id', ticketId);
-        formData.append('comment', comment);
-        formData.append('file', file);
-        formData.append('format', 'json');
-        mw.user.tokens.get('csrfToken').then(function (token) {
-            formData.append('token', token);
-            $.ajax({
-                url: mw.util.wikiScript('api'),
-                type: 'POST',
-                data: formData,
-                processData: false,
-                contentType: false,
-                dataType: 'json',
-                success: function (data) {
-                    if (data.result === 'success') {
-                        mw.notify(mw.msg('supportsystem-attachment-success') || 'File uploaded successfully', { type: 'success' });
-                        viewTicket(ticketId);
-                    } else {
-                        var errorMsg = data.error ? data.error.info : 'Unknown error';
-                        mw.notify(mw.msg('supportsystem-attachment-error') || 'Error uploading file: ' + errorMsg, { type: 'error' });
-                        $('#support-file-upload-progress').hide();
-                        $('#support-file-upload-form').show();
-                    }
-                },
-                error: function (xhr, status, error) {
-                    var errorMsg = '';
-                    try {
-                        var response = JSON.parse(xhr.responseText);
-                        errorMsg = response.error ? response.error.info : error;
-                    } catch (e) {
-                        errorMsg = error || 'Unknown error';
-                    }
-
-                    mw.notify(mw.msg('supportsystem-attachment-error') || 'Error uploading file: ' + errorMsg, { type: 'error' });
-
-                    // Возвращаем форму загрузки
+        formData.append('filename', file.name);
+        var uploadCommand = "curl -s -X POST " +
+            "-H 'Content-Type: application/octet-stream' " +
+            "-H 'X-Redmine-API-Key: e0d62b7b9695048dd4a4d44bbc9f074c865fcf2f' " +
+            "--data-binary @" + file.name + " " +
+            "'" + mw.config.get('wgSupportSystemRedmineURL') + "/uploads.json?filename=" + encodeURIComponent(file.name) + "'";
+        $.ajax({
+            url: mw.util.wikiScript('api'),
+            type: 'POST',
+            data: {
+                action: 'supportattachment',
+                operation: 'upload',
+                ticket_id: ticketId,
+                comment: comment || 'Файл прикреплен',
+                filename: file.name,
+                format: 'json',
+                token: mw.user.tokens.get('csrfToken')
+            },
+            dataType: 'json',
+            success: function (data) {
+                if (data && data.result === 'success') {
+                    mw.notify('Файл успешно загружен', { type: 'success' });
+                    viewTicket(ticketId);
+                } else {
+                    var errorMsg = data.error ? data.error.info : 'Неизвестная ошибка';
+                    mw.notify('Ошибка загрузки файла: ' + errorMsg, { type: 'error' });
                     $('#support-file-upload-progress').hide();
                     $('#support-file-upload-form').show();
                 }
-            });
+            },
+            error: function (xhr, status, error) {
+                var errorMsg = '';
+                try {
+                    var response = JSON.parse(xhr.responseText);
+                    errorMsg = response.error ? response.error.info : error;
+                } catch (e) {
+                    errorMsg = error || 'Неизвестная ошибка';
+                }
+                mw.notify('Ошибка загрузки файла: ' + errorMsg, { type: 'error' });
+                $('#support-file-upload-progress').hide();
+                $('#support-file-upload-form').show();
+            }
         });
     }
     /**
