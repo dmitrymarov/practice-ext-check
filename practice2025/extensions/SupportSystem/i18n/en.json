@@ -141,10 +141,10 @@
     "supportsystem-dt-ticket-subject": "Ticket Subject",
     "supportsystem-dt-ticket-description": "Problem Description",
     "supportsystem-dt-ticket-priority": "Priority",
-    "supportsystem-dt-priority-low": "Green",
+    "supportsystem-dt-priority-green": "Green",
     "supportsystem-dt-priority-normal": "Yellow",
-    "supportsystem-dt-priority-high": "Orange",
-    "supportsystem-dt-priority-urgent": "Red",
+    "supportsystem-dt-priority-orange": "Orange",
+    "supportsystem-dt-priority-red": "Red",
     "supportsystem-dt-cancel": "Cancel",
     "supportsystem-dt-submit": "Submit",
     "supportsystem-dt-create-ticket": "Create Ticket"

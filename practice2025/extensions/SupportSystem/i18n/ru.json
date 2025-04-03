@@ -124,10 +124,10 @@
     "supportsystem-dt-ticket-subject": "Тема заявки",
     "supportsystem-dt-ticket-description": "Описание проблемы",
     "supportsystem-dt-ticket-priority": "Приоритет",
-    "supportsystem-dt-priority-low": "Низкий",
+    "supportsystem-dt-priority-green": "Низкий",
     "supportsystem-dt-priority-normal": "Нормальный",
-    "supportsystem-dt-priority-high": "Высокий",
-    "supportsystem-dt-priority-urgent": "Срочный",
+    "supportsystem-dt-priority-orange": "Высокий",
+    "supportsystem-dt-priority-red": "Срочный",
     "supportsystem-dt-cancel": "Отмена",
     "supportsystem-dt-submit": "Отправить",
     "supportsystem-dt-create-ticket": "Создать заявку"

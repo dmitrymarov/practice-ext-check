@@ -116,10 +116,10 @@ class SpecialUnifiedSupport extends SpecialPage
                 <div class="support-form-group">
                     <label for="support-ticket-priority">{$this->msg('supportsystem-dt-ticket-priority')->escaped()}</label>
                     <select id="support-ticket-priority" class="support-select">
-                        <option value="green">{$this->msg('supportsystem-dt-priority-low')->escaped()}</option>
+                        <option value="green">{$this->msg('supportsystem-dt-priority-green')->escaped()}</option>
                         <option value="yellow" selected>{$this->msg('supportsystem-dt-priority-normal')->escaped()}</option>
-                        <option value="orange">{$this->msg('supportsystem-dt-priority-high')->escaped()}</option>
-                        <option value="red">{$this->msg('supportsystem-dt-priority-urgent')->escaped()}</option>
+                        <option value="orange">{$this->msg('supportsystem-dt-priority-orange')->escaped()}</option>
+                        <option value="red">{$this->msg('supportsystem-dt-priority-red')->escaped()}</option>
                     </select>
                 </div>
                 <div class="support-form-actions">

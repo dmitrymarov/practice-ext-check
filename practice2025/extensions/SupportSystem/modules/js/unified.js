@@ -676,26 +676,27 @@ var selectedSource = '';
             .addClass(statusClass);
         var priorityName = ((ticket.priority || {}).name || 'Yellow');
         var displayPriorityName = '';
-        switch (priorityName.toLowerCase()) {
-            case 'red':
-                displayPriorityName = 'Красный (критический)';
-                priorityClass = 'support-priority-red';
-                break;
-            case 'orange':
-                displayPriorityName = 'Оранжевый (высокий)';
-                priorityClass = 'support-priority-orange';
-                break;
-            case 'yellow':
-                displayPriorityName = 'Желтый (нормальный)';
-                priorityClass = 'support-priority-yellow';
-                break;
-            case 'green':
-                displayPriorityName = 'Зеленый (низкий)';
-                priorityClass = 'support-priority-green';
-                break;
-            default:
-                displayPriorityName = priorityName;
-                priorityClass = 'support-priority-yellow';
+        if (ticket.priority && ticket.priority.id) {
+            switch (ticket.priority.id) {
+                case 1: // Red
+                    priorityClass = 'support-priority-red';
+                    displayPriorityName = 'Красный (критический)';
+                    break;
+                case 2: // Orange
+                    priorityClass = 'support-priority-orange';
+                    displayPriorityName = 'Оранжевый (высокий)';
+                    break;
+                case 3: // Yellow
+                    priorityClass = 'support-priority-normal';
+                    displayPriorityName = 'Желтый (нормальный)';
+                    break;
+                case 4: // Green
+                    priorityClass = 'support-priority-green';
+                    displayPriorityName = 'Зеленый (низкий)';
+                    break;
+            }
+        } else {
+            priorityClass = 'support-priority-normal';
         }
         $('#support-ticket-priority-value').text(priorityName)
             .removeClass()

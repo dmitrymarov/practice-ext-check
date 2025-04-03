@@ -439,7 +439,7 @@
 }
 
 /* Приоритеты заявок */
-.support-priority-low {
+.support-priority-green {
     background-color: #6c757d;
     color: white;
 }
@@ -449,12 +449,12 @@
     color: white;
 }
 
-.support-priority-high {
+.support-priority-orange {
     background-color: #ffc107;
     color: #333;
 }
 
-.support-priority-urgent {
+.support-priority-red {
     background-color: #dc3545;
     color: white;
 }
@@ -665,4 +665,27 @@
     .support-form-container {
         padding: 15px;
     }
+        .support-priority-green,
+        .support-priority-green {
+            background-color: #4caf50; /* Зеленый */
+            color: white;
+        }
+    
+        .support-priority-yellow,
+        .support-priority-normal {
+            background-color: #ffc107; /* Жёлтый */
+            color: #333;
+        }
+    
+        .support-priority-orange,
+        .support-priority-orange {
+            background-color: #ff9800; /* Оранжевый */
+            color: white;
+        }
+    
+        .support-priority-red,
+        .support-priority-red {
+            background-color: #f44336; /* Красный */
+            color: white;
+        }
 }
