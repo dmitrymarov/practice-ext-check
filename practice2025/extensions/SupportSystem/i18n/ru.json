@@ -130,5 +130,10 @@
     "supportsystem-dt-priority-red": "Срочный",
     "supportsystem-dt-cancel": "Отмена",
     "supportsystem-dt-submit": "Отправить",
-    "supportsystem-dt-create-ticket": "Создать заявку"
+    "supportsystem-dt-create-ticket": "Создать заявку",
+    "supportsystem-attachment-upload": "Загрузить файл",
+    "supportsystem-attachment-add": "Выбрать файл",
+    "supportsystem-attachment-list": "Вложения",
+    "supportsystem-attachment-error": "Ошибка загрузки файла",
+    "supportsystem-attachment-success": "Файл успешно загружен"
 }

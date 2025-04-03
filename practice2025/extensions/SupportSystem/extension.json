@@ -36,6 +36,9 @@
         },
         "unifiedsearch": {
             "class": "MediaWiki\\Extension\\SupportSystem\\API\\ApiUnifiedSearch"
+        },
+        "supportattachment": {
+            "class": "MediaWiki\\Extension\\SupportSystem\\API\\ApiSupportAttachment"
         }
     },
     "Hooks": {
@@ -115,7 +118,11 @@
                 "supportsystem-sd-ticket-priority",
                 "supportsystem-sd-ticket-created",
                 "supportsystem-sd-ticket-description",
-                "supportsystem-sd-ticket-comments"
+                "supportsystem-sd-ticket-comments",
+                "supportsystem-attachment-upload",
+                "supportsystem-attachment-add",
+                "supportsystem-attachment-error",
+                "supportsystem-attachment-success"
             ]
         },
         "ext.supportSystem.graphAdmin": {

@@ -34,7 +34,7 @@ class ServiceDesk
     }
 
     /**
-     * Create a ticket in Redmine using direct curl
+     * Create a ticket in Redmine using PHP curl extension
      * 
      * @param string $subject Ticket subject
      * @param string $description Ticket description
@@ -48,7 +48,6 @@ class ServiceDesk
     {
         wfDebugLog('SupportSystem', "Creating ticket: '$subject', priority: $priority");
         $priorityId = $this->getPriorityId($priority);
-
         $issueData = [
             'issue' => [
                 'subject' => $subject,
@@ -59,49 +58,51 @@ class ServiceDesk
                 'status_id' => 1
             ]
         ];
-
         if ($assignedTo) {
             $issueData['issue']['assigned_to_id'] = $assignedTo;
         }
-
         $url = rtrim($this->apiUrl, '/') . "/issues.json";
         wfDebugLog('SupportSystem', "Request URL: $url");
         wfDebugLog('SupportSystem', "Request data: " . json_encode($issueData));
-
         $attempts = 0;
         $lastError = null;
-
         while ($attempts < $this->maxRetryAttempts) {
             try {
-                wfDebugLog('SupportSystem', "Attempt " . ($attempts + 1) . " to create ticket using curl");
-
-                // Формируем curl запрос
+                wfDebugLog('SupportSystem', "Attempt " . ($attempts + 1) . " to create ticket using PHP curl");
+                $ch = curl_init($url);
                 $jsonData = json_encode($issueData);
-                $command = "curl -s -X POST \"$url\" " .
-                    "-H \"Content-Type: application/json\" " .
-                    "-H \"X-Redmine-API-Key: {$this->apiKey}\" " .
-                    "-d '" . addslashes($jsonData) . "'";
-
-                wfDebugLog('SupportSystem', "Executing curl command: $command");
-                $response = shell_exec($command);
+                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonData);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                    'Content-Type: application/json',
+                    'X-Redmine-API-Key: ' . $this->apiKey,
+                    'Content-Length: ' . strlen($jsonData)
+                ]);
+                $response = curl_exec($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $curlError = curl_error($ch);
+                curl_close($ch);
+                wfDebugLog('SupportSystem', "Response HTTP code: $httpCode");
                 wfDebugLog('SupportSystem', "Response: " . substr($response, 0, 500));
-
+                if ($curlError) {
+                    throw new MWException("cURL error: $curlError");
+                }
+                if ($httpCode >= 400) {
+                    throw new MWException("HTTP error $httpCode: $response");
+                }
                 if (!$response) {
                     throw new MWException("Empty response from Redmine API");
                 }
-
                 $data = json_decode($response, true);
-
                 if (!isset($data['issue'])) {
                     throw new MWException("Invalid response format from Redmine API: " . substr($response, 0, 200));
                 }
-
                 wfDebugLog('SupportSystem', "Ticket created successfully, ID: " . $data['issue']['id']);
                 return $data['issue'];
             } catch (MWException $e) {
                 $lastError = $e;
                 wfDebugLog('SupportSystem', "Exception in createTicket: " . $e->getMessage());
-
                 $attempts++;
                 if ($attempts < $this->maxRetryAttempts) {
                     sleep($this->retryDelay);
@@ -109,7 +110,6 @@ class ServiceDesk
                 }
             }
         }
-
         throw new MWException("Failed to create ticket after {$this->maxRetryAttempts} attempts: " .
             ($lastError ? $lastError->getMessage() : "Unknown error"));
     }
@@ -247,6 +247,146 @@ class ServiceDesk
         } catch (\Exception $e) {
             wfDebugLog('SupportSystem', "Exception getting tickets: " . $e->getMessage());
             return [];
+        }
+    }
+    /**
+     * Upload a file to Redmine and get an upload token
+     * 
+     * @param string $filePath Path to the file
+     * @param string $fileName Optional filename (if different from the actual file)
+     * @param string $contentType Content type of the file
+     * @return string Upload token
+     * @throws MWException When upload fails
+     */
+    public function uploadFile(string $filePath, string $fileName = '', string $contentType = ''): string
+    {
+        wfDebugLog('SupportSystem', "Uploading file: $filePath");
+        if (!file_exists($filePath)) {
+            throw new MWException("File not found: $filePath");
+        }
+        $url = rtrim($this->apiUrl, '/') . "/uploads.json";
+        if (empty($fileName)) {
+            $fileName = basename($filePath);
+        }
+        if (empty($contentType)) {
+            $finfo = new \finfo(FILEINFO_MIME_TYPE);
+            $contentType = $finfo->file($filePath);
+        }
+        $fileContent = file_get_contents($filePath);
+        $attempts = 0;
+        $lastError = null;
+        while ($attempts < $this->maxRetryAttempts) {
+            try {
+                wfDebugLog('SupportSystem', "Attempt " . ($attempts + 1) . " to upload file using PHP curl");
+                $ch = curl_init($url);
+                curl_setopt($ch, CURLOPT_POST, true);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $fileContent);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                    'Content-Type: application/octet-stream',
+                    'X-Redmine-API-Key: ' . $this->apiKey,
+                    'Content-Length: ' . strlen($fileContent)
+                ]);
+                $response = curl_exec($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $curlError = curl_error($ch);
+                curl_close($ch);
+                wfDebugLog('SupportSystem', "Response HTTP code: $httpCode");
+                wfDebugLog('SupportSystem', "Response: " . substr($response, 0, 500));
+                if ($curlError) {
+                    throw new MWException("cURL error: $curlError");
+                }
+                if ($httpCode >= 400) {
+                    throw new MWException("HTTP error $httpCode: $response");
+                }
+                if (!$response) {
+                    throw new MWException("Empty response from Redmine API");
+                }
+                $data = json_decode($response, true);
+                if (!isset($data['upload']) || !isset($data['upload']['token'])) {
+                    throw new MWException("Invalid response format from Redmine API: " . substr($response, 0, 200));
+                }
+                $token = $data['upload']['token'];
+                wfDebugLog('SupportSystem', "File uploaded successfully, token: $token");
+                return $token;
+            } catch (MWException $e) {
+                $lastError = $e;
+                wfDebugLog('SupportSystem', "Exception in uploadFile: " . $e->getMessage());
+                $attempts++;
+                if ($attempts < $this->maxRetryAttempts) {
+                    sleep($this->retryDelay);
+                    continue;
+                }
+            }
+        }
+        throw new MWException("Failed to upload file after {$this->maxRetryAttempts} attempts: " .
+            ($lastError ? $lastError->getMessage() : "Unknown error"));
+    }
+    /**
+     * Attach a file to an existing ticket
+     * 
+     * @param int $ticketId Ticket ID
+     * @param string $filePath Path to the file
+     * @param string $fileName Optional filename (if different from the actual file)
+     * @param string $contentType Content type of the file
+     * @param string $comment Optional comment to add with the attachment
+     * @return bool Success status
+     * @throws MWException When attachment fails
+     */
+    public function attachFileToTicket(int $ticketId, string $filePath, string $fileName = '', string $contentType = '', string $comment = ''): bool
+    {
+        wfDebugLog('SupportSystem', "Attaching file to ticket #$ticketId: $filePath");
+        try {
+            // Шаг 1: Загрузить файл и получить токен
+            $token = $this->uploadFile($filePath, $fileName, $contentType);
+
+            // Шаг 2: Обновить заявку с токеном загруженного файла
+            $url = rtrim($this->apiUrl, '/') . "/issues/$ticketId.json";
+            if (empty($fileName)) {
+                $fileName = basename($filePath);
+            }
+            if (empty($contentType)) {
+                $finfo = new \finfo(FILEINFO_MIME_TYPE);
+                $contentType = $finfo->file($filePath);
+            }
+            $issueData = [
+                'issue' => [
+                    'notes' => $comment ?: 'File attached',
+                    'uploads' => [
+                        [
+                            'token' => $token,
+                            'filename' => $fileName,
+                            'content_type' => $contentType
+                        ]
+                    ]
+                ]
+            ];
+            $jsonData = json_encode($issueData);
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PUT");
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonData);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Content-Type: application/json',
+                'X-Redmine-API-Key: ' . $this->apiKey,
+                'Content-Length: ' . strlen($jsonData)
+            ]);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlError = curl_error($ch);
+            curl_close($ch);
+            wfDebugLog('SupportSystem', "Response HTTP code: $httpCode");
+            if ($curlError) {
+                throw new MWException("cURL error: $curlError");
+            }
+            if ($httpCode >= 400) {
+                throw new MWException("HTTP error $httpCode: $response");
+            }
+            wfDebugLog('SupportSystem', "File attached to ticket #$ticketId successfully");
+            return true;
+        } catch (MWException $e) {
+            wfDebugLog('SupportSystem', "Exception in attachFileToTicket: " . $e->getMessage());
+            throw $e;
         }
     }
 

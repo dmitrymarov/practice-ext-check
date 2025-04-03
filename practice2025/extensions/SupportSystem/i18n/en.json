@@ -147,5 +147,10 @@
     "supportsystem-dt-priority-red": "Red",
     "supportsystem-dt-cancel": "Cancel",
     "supportsystem-dt-submit": "Submit",
-    "supportsystem-dt-create-ticket": "Create Ticket"
+    "supportsystem-dt-create-ticket": "Create Ticket",
+    "supportsystem-attachment-upload": "Upload File",
+    "supportsystem-attachment-add": "Select File",
+    "supportsystem-attachment-list": "Attachments",
+    "supportsystem-attachment-error": "Error uploading file",
+    "supportsystem-attachment-success": "File uploaded successfully"
 }

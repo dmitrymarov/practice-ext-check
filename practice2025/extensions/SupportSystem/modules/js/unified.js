@@ -606,54 +606,54 @@ var selectedSource = '';
         });
     }
     /**
-     * Отображение деталей заявки
-     * @param {Object} ticket Данные заявки
-     */
+ * Отображение деталей заявки
+ * @param {Object} ticket Данные заявки
+ */
     function displayTicketDetails(ticket) {
         console.log('Отображение деталей тикета:', ticket);
         if ($('#support-ticket-details-title').length === 0) {
             $('#support-ticket-details').html(`
-            <div class="support-ticket-details-header">
-                <h3 id="support-ticket-details-title"></h3>
-                <button id="support-ticket-details-back" class="support-button-secondary">
-                    ${mw.msg('supportsystem-sd-ticket-back') || 'Back to List'}
-                </button>
-            </div>
-            
-            <div class="support-ticket-details-info">
-                <div class="support-ticket-status">
-                    <span class="support-label">${mw.msg('supportsystem-sd-ticket-status') || 'Status'}:</span>
-                    <span id="support-ticket-status"></span>
-                </div>
-                <div class="support-ticket-priority">
-                    <span class="support-label">${mw.msg('supportsystem-sd-ticket-priority') || 'Priority'}:</span>
-                    <span id="support-ticket-priority-value"></span>
-                </div>
-                <div class="support-ticket-created">
-                    <span class="support-label">${mw.msg('supportsystem-sd-ticket-created') || 'Created On'}:</span>
-                    <span id="support-ticket-created-date"></span>
-                </div>
-            </div>
-            
-            <div class="support-ticket-description-section">
-                <h4>${mw.msg('supportsystem-sd-ticket-description') || 'Description'}</h4>
-                <div id="support-ticket-description-text" class="support-ticket-description-content"></div>
-            </div>
-            
-            <div class="support-ticket-comments-section">
-                <h4>${mw.msg('supportsystem-sd-ticket-comments') || 'Comments'}</h4>
-                <div id="support-ticket-comments" class="support-ticket-comments-list"></div>
-                
-                <div class="support-comment-form">
-                    <h5>${mw.msg('supportsystem-sd-ticket-add-comment') || 'Add Comment'}</h5>
-                    <textarea id="support-comment-text" class="support-textarea" 
-                        placeholder="${mw.msg('supportsystem-sd-ticket-comment-placeholder') || 'Enter your comment...'}"></textarea>
-                    <button id="support-comment-submit" class="support-button-primary">
-                        ${mw.msg('supportsystem-sd-ticket-comment-submit') || 'Submit'}
+                <div class="support-ticket-details-header">
+                    <h3 id="support-ticket-details-title"></h3>
+                    <button id="support-ticket-details-back" class="support-button-secondary">
+                        ${mw.msg('supportsystem-sd-ticket-back') || 'Back to List'}
                     </button>
                 </div>
-            </div>
-        `);
+                
+                <div class="support-ticket-details-info">
+                    <div class="support-ticket-status">
+                        <span class="support-label">${mw.msg('supportsystem-sd-ticket-status') || 'Status'}:</span>
+                        <span id="support-ticket-status"></span>
+                    </div>
+                    <div class="support-ticket-priority">
+                        <span class="support-label">${mw.msg('supportsystem-sd-ticket-priority') || 'Priority'}:</span>
+                        <span id="support-ticket-priority-value"></span>
+                    </div>
+                    <div class="support-ticket-created">
+                        <span class="support-label">${mw.msg('supportsystem-sd-ticket-created') || 'Created On'}:</span>
+                        <span id="support-ticket-created-date"></span>
+                    </div>
+                </div>
+                
+                <div class="support-ticket-description-section">
+                    <h4>${mw.msg('supportsystem-sd-ticket-description') || 'Description'}</h4>
+                    <div id="support-ticket-description-text" class="support-ticket-description-content"></div>
+                </div>
+                
+                <div class="support-ticket-comments-section">
+                    <h4>${mw.msg('supportsystem-sd-ticket-comments') || 'Comments'}</h4>
+                    <div id="support-ticket-comments" class="support-ticket-comments-list"></div>
+                    
+                    <div class="support-comment-form">
+                        <h5>${mw.msg('supportsystem-sd-ticket-add-comment') || 'Add Comment'}</h5>
+                        <textarea id="support-comment-text" class="support-textarea" 
+                            placeholder="${mw.msg('supportsystem-sd-ticket-comment-placeholder') || 'Enter your comment...'}"></textarea>
+                        <button id="support-comment-submit" class="support-button-primary">
+                            ${mw.msg('supportsystem-sd-ticket-comment-submit') || 'Submit'}
+                        </button>
+                    </div>
+                </div>
+            `);
             $('#support-ticket-details-back').on('click', function () {
                 $('#support-ticket-details').hide();
                 $('#support-tickets-list').show();
@@ -676,6 +676,8 @@ var selectedSource = '';
             .addClass(statusClass);
         var priorityName = ((ticket.priority || {}).name || 'Yellow');
         var displayPriorityName = '';
+        var priorityClass = 'support-priority-normal';
+        
         if (ticket.priority && ticket.priority.id) {
             switch (ticket.priority.id) {
                 case 1: // Red
@@ -694,13 +696,18 @@ var selectedSource = '';
                     priorityClass = 'support-priority-green';
                     displayPriorityName = 'Зеленый (низкий)';
                     break;
+                default:
+                    priorityClass = 'support-priority-normal';
+                    displayPriorityName = 'Нормальный';
             }
         } else {
-            priorityClass = 'support-priority-normal';
+            displayPriorityName = 'Нормальный';
         }
-        $('#support-ticket-priority-value').text(priorityName)
+        
+        $('#support-ticket-priority-value').text(displayPriorityName || priorityName)
             .removeClass()
             .addClass(priorityClass);
+        
         $('#support-ticket-created-date').text(formatDate(ticket.created_on));
         $('#support-ticket-description-text').text(ticket.description || '');
         var commentsHtml = '';
@@ -727,6 +734,31 @@ var selectedSource = '';
         }
         $('#support-ticket-comments').html(commentsHtml);
         $('#support-comment-text').val('');
+        if (ticket.attachments && ticket.attachments.length > 0) {
+            var attachmentsHtml = '<div class="support-ticket-attachments-section">' +
+                '<h4>' + (mw.msg('supportsystem-attachment-list') || 'Attachments') + '</h4>' +
+                '<div class="support-attachments-list">';
+            
+            ticket.attachments.forEach(function(attachment) {
+                attachmentsHtml += '<div class="support-attachment-item">' +
+                    '<a href="' + attachment.content_url + '" target="_blank" class="support-attachment-link">' +
+                    '<span class="support-attachment-icon">📎</span> ' +
+                    attachment.filename + ' (' + formatFileSize(attachment.filesize) + ')' +
+                    '</a>' +
+                    '</div>';
+            });
+            
+            attachmentsHtml += '</div></div>';
+            
+            // Удаляем предыдущую секцию вложений, если она есть
+            $('.support-ticket-attachments-section').remove();
+            
+            // Вставляем список вложений перед секцией комментариев
+            $('.support-ticket-comments-section').before(attachmentsHtml);
+        }
+        
+        // Инициализируем форму загрузки файлов
+        initFileUpload();
     }
     /**
      * Показать форму создания заявки
@@ -907,7 +939,115 @@ var selectedSource = '';
             $('#support-comment-submit').prop('disabled', false);
         });
     }
+    /**
+     * Функция для инициализации загрузки файлов
+     */
+    function initFileUpload() {
+        if ($('#support-ticket-details').length && !$('#support-file-upload-form').length) {
+            var uploadFormHtml = `
+            <div class="support-file-upload-section">
+                <h4>${mw.msg('supportsystem-attachment-upload') || 'Upload File'}</h4>
+                <form id="support-file-upload-form" enctype="multipart/form-data">
+                    <div class="support-form-group">
+                        <label for="support-file-input">${mw.msg('supportsystem-attachment-add') || 'Add File'}</label>
+                        <input type="file" id="support-file-input" class="support-file-input" name="file">
+                    </div>
+                    <div class="support-form-group">
+                        <label for="support-file-comment">${mw.msg('supportsystem-sd-ticket-comment-placeholder') || 'Comment'}</label>
+                        <textarea id="support-file-comment" class="support-textarea" rows="2"></textarea>
+                    </div>
+                    <button type="submit" id="support-file-upload-button" class="support-button-primary">
+                        ${mw.msg('supportsystem-attachment-upload') || 'Upload'}
+                    </button>
+                </form>
+                <div id="support-file-upload-progress" class="support-upload-progress" style="display: none;">
+                    <div class="support-spinner"></div>
+                    <p>${mw.msg('supportsystem-dt-submitting') || 'Uploading...'}</p>
+                </div>
+            </div>
+        `;
+            $('.support-ticket-comments-section').before(uploadFormHtml);
+            $('#support-file-upload-form').on('submit', function (e) {
+                e.preventDefault();
+                uploadFileToTicket();
+            });
+        }
+    }
+    /**
+ * Функция для загрузки файла к тикету
+ */
+    function uploadFileToTicket() {
+        var ticketId = $('#support-ticket-details').data('ticket-id');
+        var fileInput = $('#support-file-input')[0];
+        var comment = $('#support-file-comment').val();
+        if (!fileInput.files || fileInput.files.length === 0) {
+            mw.notify(mw.msg('supportsystem-attachment-error') || 'Please select a file to upload', { type: 'error' });
+            return;
+        }
+        var file = fileInput.files[0];
+        $('#support-file-upload-form').hide();
+        $('#support-file-upload-progress').show();
+        var formData = new FormData();
+        formData.append('action', 'supportattachment');
+        formData.append('operation', 'upload');
+        formData.append('ticket_id', ticketId);
+        formData.append('comment', comment);
+        formData.append('file', file);
+        formData.append('format', 'json');
+        mw.user.tokens.get('csrfToken').then(function (token) {
+            formData.append('token', token);
+            $.ajax({
+                url: mw.util.wikiScript('api'),
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                dataType: 'json',
+                success: function (data) {
+                    if (data.result === 'success') {
+                        mw.notify(mw.msg('supportsystem-attachment-success') || 'File uploaded successfully', { type: 'success' });
+                        viewTicket(ticketId);
+                    } else {
+                        var errorMsg = data.error ? data.error.info : 'Unknown error';
+                        mw.notify(mw.msg('supportsystem-attachment-error') || 'Error uploading file: ' + errorMsg, { type: 'error' });
+                        $('#support-file-upload-progress').hide();
+                        $('#support-file-upload-form').show();
+                    }
+                },
+                error: function (xhr, status, error) {
+                    var errorMsg = '';
+                    try {
+                        var response = JSON.parse(xhr.responseText);
+                        errorMsg = response.error ? response.error.info : error;
+                    } catch (e) {
+                        errorMsg = error || 'Unknown error';
+                    }
 
+                    mw.notify(mw.msg('supportsystem-attachment-error') || 'Error uploading file: ' + errorMsg, { type: 'error' });
+
+                    // Возвращаем форму загрузки
+                    $('#support-file-upload-progress').hide();
+                    $('#support-file-upload-form').show();
+                }
+            });
+        });
+    }
+    /**
+     * Форматирование размера файла
+     * @param {number} bytes Размер в байтах
+     * @return {string} Отформатированный размер
+     */
+    function formatFileSize(bytes) {
+        if (bytes < 1024) {
+            return bytes + ' B';
+        } else if (bytes < 1024 * 1024) {
+            return (bytes / 1024).toFixed(1) + ' KB';
+        } else if (bytes < 1024 * 1024 * 1024) {
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        } else {
+            return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
+        }
+    }
     /**
      * Показать сообщение об успешном создании заявки
      * @param {number} ticketId ID заявки
