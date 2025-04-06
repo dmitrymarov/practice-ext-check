@@ -129,7 +129,6 @@ $wgSupportSystemOpenSearchIndex = 'solutions';
 $wgSupportSystemRedmineAPIKey = 'e0d62b7b9695048dd4a4d44bbc9f074c865fcf2f';
 $wgSupportSystemRedmineURL = getenv('REDMINE_URL') ?: 'http://redmine:3000';
 $wgSupportSystemAIServiceURL = getenv('AI_SERVICE_URL') ?: 'http://ai-service:5000';
-$wgSupportSystemUseMock = false;
 $wgSupportSystemGraphDataFile = '/var/www/html/extensions/SupportSystem/data/graph_data.json';
 
 
@@ -149,9 +148,6 @@ $wgCirrusSearchServers = [
     ]
 ];
 
-// Отключение SSL для OpenSearch
-$wgCirrusSearchUseSSL = false;
-$wgCirrusSearchUseOpenSearch = true;
 $wgAPIModules['unifiedsearch'] = 'MediaWiki\Extension\SupportSystem\API\ApiUnifiedSearch';
 $wgSupportSystemAIServiceURL = 'http://ai-service:5000';
 
@@ -171,3 +167,9 @@ wfLoadExtension('SupportSystem');
 wfLoadExtension('Elastica');
 wfLoadExtension('CirrusSearch');
 wfLoadExtension('SyntaxHighlight_GeSHi');
+wfLoadExtension('AdvancedSearch');
+wfLoadExtension('Echo');
+wfLoadExtension('PdfHandler');
+wfLoadExtension('TimedMediaHandler');
+wfLoadExtension('VisualEditor');
+$wgShowExceptionDetails = true;
