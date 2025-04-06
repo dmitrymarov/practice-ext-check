@@ -5,8 +5,6 @@
         ]
     },
     "supportsystem-desc": "Система обработки запросов пользователей для MediaWiki.",
-    "supportsystem-dt-title": "Диалоговый модуль поиска решений",
-    "supportsystem-dt-desc": "Используйте диалоговый модуль для поиска решения вашей проблемы.",
     "supportsystem-dt-welcome": "Добро пожаловать в диалоговый модуль поиска решений. Нажмите кнопку ниже, чтобы начать диалог.",
     "supportsystem-dt-start": "Начать диалог",
     "supportsystem-dt-restart": "Начать заново",

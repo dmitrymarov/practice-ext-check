@@ -6,23 +6,23 @@ use MWException;
 use FormatJson;
 
 /**
- * Класс для поиска решений
+ * Class for search functionality
  */
 class SearchModule
 {
-	/** @var string Хост OpenSearch */
+	/** @var string OpenSearch host */
 	private $host;
 
-	/** @var int Порт OpenSearch */
+	/** @var int OpenSearch port */
 	private $port;
 
-	/** @var string Имя индекса OpenSearch */
+	/** @var string OpenSearch index name */
 	private $indexName;
 
-	/** @var int Кэш (время жизни в секундах - 12 часов) */
+	/** @var int Cache lifetime in seconds (12 hours) */
 	private $cacheLifetime = 43200;
 
-	/** @var string Каталог кэша для результатов поиска */
+	/** @var string Cache directory for search results */
 	private $cacheDir;
 
 	public function __construct()
@@ -33,6 +33,7 @@ class SearchModule
 		$this->indexName = $config->get('SupportSystemOpenSearchIndex');
 		$this->setupCacheDirectory();
 	}
+
 	private function setupCacheDirectory()
 	{
 		$this->cacheDir = wfTempDir() . DIRECTORY_SEPARATOR . 'support_system_cache';
@@ -41,6 +42,7 @@ class SearchModule
 		}
 		$this->cleanupCacheDirectory();
 	}
+
 	private function cleanupCacheDirectory()
 	{
 		$now = time();
@@ -55,14 +57,15 @@ class SearchModule
 	}
 
 	/**
-	 * Комплексный поиск
-	 * @param string $query Поисковый запрос
-	 * @param array $searchMethods Методы поиска ('opensearch', 'cirrus', 'ai')
-	 * @param array $context Предыдущий контекст (опционально)
-	 * @param string|null $userId ID пользователя для отслеживания контекста
-	 * @return array Результаты поиска с метаданными
+	 * Comprehensive search across multiple sources
+	 * 
+	 * @param string $query Search query
+	 * @param array $searchMethods Search methods to use ('opensearch', 'mediawiki')
+	 * @param array $context Previous context (optional)
+	 * @param string|null $userId User ID for context tracking
+	 * @return array Search results with metadata
 	 */
-	public function comprehensiveSearch(string $query, array $searchMethods = ['opensearch', 'cirrus'], array $context = [], string $userId = null): array
+	public function comprehensiveSearch(string $query, array $searchMethods = ['opensearch', 'mediawiki'], array $context = [], string $userId = null): array
 	{
 		$results = [];
 		$debugInfo = [
@@ -90,64 +93,42 @@ class SearchModule
 				];
 			}
 		}
-		if (in_array('cirrus', $searchMethods) && class_exists('CirrusSearch\CirrusSearch')) {
+		if (in_array('mediawiki', $searchMethods)) {
 			try {
-				$cirrusResults = $this->searchCirrus($query);
-				$results = array_merge($results, $cirrusResults);
-				$debugInfo['cirrus'] = [
-					'count' => count($cirrusResults),
+				$mediawikiResults = $this->searchMediaWiki($query);
+				$results = array_merge($results, $mediawikiResults);
+				$debugInfo['mediawiki'] = [
+					'count' => count($mediawikiResults),
 					'status' => 'success'
 				];
 			} catch (\Exception $e) {
-				$debugInfo['cirrus'] = [
+				$debugInfo['mediawiki'] = [
 					'status' => 'error',
 					'message' => $e->getMessage()
 				];
 			}
 		}
-		if (in_array('ai', $searchMethods)) {
-			try {
-				$aiResult = $this->searchAI($query, $context, $userId);
-				$debugInfo['ai'] = [
-					'status' => $aiResult['success'] ? 'success' : 'failed',
-					'sourcesCount' => count($aiResult['sources'] ?? [])
-				];
-				if ($aiResult['success']) {
-					$aiResults = [
-						[
-							'id' => 'ai_' . md5($query),
-							'title' => 'AI решение для: ' . $query,
-							'content' => $aiResult['answer'],
-							'score' => 1.0,
-							'source' => 'ai',
-							'ai_result' => $aiResult
-						]
-					];
-					$results = array_merge($aiResults, $results);
-				}
-			} catch (\Exception $e) {
-				$debugInfo['ai'] = [
-					'status' => 'error',
-					'message' => $e->getMessage()
-				];
-			}
-		}
-		usort($results, function ($a, $b) { $b['score'] <=> $a['score']; });
+		usort($results, function ($a, $b) {
+			return $b['score'] <=> $a['score'];
+		});
 		$debugInfo['totalCount'] = count($results);
 		$debugInfo['totalTime'] = microtime(true) - $debugInfo['startTime'];
 		$returnData = [
 			'results' => $results,
 			'debug' => $debugInfo
 		];
-		if (count($results) > 0) { $this->saveToCache($cacheKey, $returnData); }
+		if (count($results) > 0) {
+			$this->saveToCache($cacheKey, $returnData);
+		}
 		return $returnData;
 	}
 
 	/**
-	 * Поиск в OpenSearch с использованием curl
-	 * @param string $query Поисковый запрос
-	 * @param int $size Количество результатов
-	 * @return array
+	 * Search in OpenSearch using curl
+	 * 
+	 * @param string $query Search query
+	 * @param int $size Number of results
+	 * @return array Search results
 	 * @throws MWException
 	 */
 	private function searchOpenSearch(string $query, int $size = 10): array
@@ -173,7 +154,7 @@ class SearchModule
 			"-d " . escapeshellarg($jsonData) . " \"$url\"";
 		$response = shell_exec($command);
 		if ($response === false || empty($response)) {
-			throw new MWException("Ошибка подключения к OpenSearch");
+			throw new MWException("Error connecting to OpenSearch");
 		}
 		$data = json_decode($response, true);
 		if (!isset($data['hits']['hits'])) {
@@ -190,49 +171,76 @@ class SearchModule
 				'source' => 'opensearch',
 				'url' => $source['url'] ?? ''
 			];
-			if (isset($hit['highlight']['content'])) { $result['highlight'] = $hit['highlight']['content'][0]; }
-			if (isset($source['tags'])) { $result['tags'] = $source['tags']; }
+			if (isset($hit['highlight']['content'])) {
+				$result['highlight'] = $hit['highlight']['content'][0];
+			}
+			if (isset($source['tags'])) {
+				$result['tags'] = $source['tags'];
+			}
 			$results[] = $result;
+		}
+
+		return $results;
+	}
+
+	/**
+	 * Search MediaWiki using curl to the API
+	 * 
+	 * @param string $query Search query
+	 * @param int $limit Maximum number of results
+	 * @return array Search results
+	 * @throws MWException
+	 */
+	private function searchMediaWiki(string $query, int $limit = 10): array
+	{
+		$apiUrl = wfScript('api');
+		$params = [
+			'action' => 'query',
+			'list' => 'search',
+			'srsearch' => $query,
+			'srnamespace' => 0,
+			'srlimit' => $limit,
+			'srinfo' => 'totalhits|suggestion',
+			'srprop' => 'size|wordcount|timestamp|snippet|titlesnippet|redirecttitle|redirectsnippet|sectiontitle|sectionsnippet|categorysnippet|score|hasrelated|extensiondata',
+			'format' => 'json'
+		];
+		$queryString = http_build_query($params);
+		$command = "curl -s \"$apiUrl?$queryString\"";
+		$response = shell_exec($command);
+
+		if ($response === false || empty($response)) {
+			throw new MWException("Error connecting to MediaWiki API");
+		}
+		$data = json_decode($response, true);
+		if (!isset($data['query']['search'])) {
+			return [];
+		}
+		$results = [];
+		foreach ($data['query']['search'] as $item) {
+			$title = \Title::newFromText($item['title']);
+			if (!$title) {
+				continue;
+			}
+			$results[] = [
+				'id' => $item['pageid'],
+				'title' => $item['title'],
+				'content' => $item['snippet'] ?? '',
+				'score' => isset($item['score']) ? $item['score'] / 100 : 0.5, // Normalize score
+				'source' => 'mediawiki',
+				'url' => $title->getFullURL(),
+				'highlight' => $item['snippet'] ?? '',
+				'timestamp' => $item['timestamp'] ?? ''
+			];
 		}
 		return $results;
 	}
 
 	/**
-	 * Поиск
-	 * @param string $query Поисковый запрос
-	 * @param array $context Контекст диалога
-	 * @param string|null $userId ID пользователя
-	 * @return array Результат AI-поиска
-	 * @throws MWException
-	 */
-	private function searchAI(string $query, array $context = [], string $userId = null): array
-	{
-		$config = MediaWikiServices::getInstance()->getMainConfig();
-		$aiServiceUrl = $config->get('SupportSystemAIServiceURL');
-		$requestData = [
-			'query' => $query,
-			'context' => $context
-		];
-		if ($userId) { $requestData['user_id'] = $userId; }
-		$jsonData = json_encode($requestData);
-		$url = rtrim($aiServiceUrl, '/') . "/api/search_ai";
-		$command = "curl -s -X POST -H \"Content-Type: application/json\" " .
-			"-d " . escapeshellarg($jsonData) . " \"$url\"";
-		$response = shell_exec($command);
-		if ($response === false || empty($response)) { throw new MWException("Ошибка подключения к AI сервису"); }
-		$data = json_decode($response, true);
-		return [
-			'answer' => $data['answer'] ?? 'Ответ не получен',
-			'sources' => $data['sources'] ?? [],
-			'success' => $data['success'] ?? false
-		];
-	}
-
-	/**
-	 * Сохранение результатов поиска в кэш
-	 * @param string $key Ключ кэша
-	 * @param array $data Данные для кэширования
-	 * @return bool Успех операции
+	 * Save search results to cache
+	 * 
+	 * @param string $key Cache key
+	 * @param array $data Data to cache
+	 * @return bool Success status
 	 */
 	private function saveToCache($key, $data)
 	{
@@ -241,14 +249,18 @@ class SearchModule
 			'timestamp' => time(),
 			'data' => $data
 		];
-		try { return file_put_contents($cacheFile, FormatJson::encode($cacheData), LOCK_EX) !== false; }
-		catch (\Exception $e) { return false; }
+		try {
+			return file_put_contents($cacheFile, FormatJson::encode($cacheData), LOCK_EX) !== false;
+		} catch (\Exception $e) {
+			return false;
+		}
 	}
 
 	/**
-	 * Получение результатов поиска из кэша
-	 * @param string $key Ключ кэша
-	 * @return array|false Закэшированные данные или false если не найдено/истекло
+	 * Get search results from cache
+	 * 
+	 * @param string $key Cache key
+	 * @return array|false Cached data or false if not found/expired
 	 */
 	private function getFromCache($key)
 	{
@@ -256,9 +268,15 @@ class SearchModule
 		if (!file_exists($cacheFile)) { return false; }
 		try {
 			$cacheData = FormatJson::decode(file_get_contents($cacheFile), true);
-			if (!isset($cacheData['timestamp']) || !isset($cacheData['data'])) { return false; }
-			if (time() - $cacheData['timestamp'] > $this->cacheLifetime) { return false; }
+			if (!isset($cacheData['timestamp']) || !isset($cacheData['data'])) {
+				return false;
+			}
+			if (time() - $cacheData['timestamp'] > $this->cacheLifetime) {
+				return false;
+			}
 			return $cacheData['data'];
-		} catch (\Exception $e) { return false; }
+		} catch (\Exception $e) {
+			return false;
+		}
 	}
 }

@@ -123,10 +123,22 @@
                 "supportsystem-attachment-add",
                 "supportsystem-attachment-error",
                 "supportsystem-attachment-success",
+                "supportsystem-attachment-list",
                 "supportsystem-sd-ticket-comment-placeholder",
                 "supportsystem-sd-ticket-no-comments",
                 "supportsystem-sd-ticket-add-comment",
-                "supportsystem-sd-ticket-comment-submit"
+                "supportsystem-sd-ticket-comment-submit",
+                "supportsystem-search-results-count",
+                "supportsystem-search-source",
+                "supportsystem-search-default-subject",
+                "supportsystem-dt-dialog-history",
+                "supportsystem-dt-dialog-item",
+                "supportsystem-search-default-description",
+                "supportsystem-dt-dialog-solution",
+                "supportsystem-sd-ticket-comment-required",
+                "supportsystem-sd-ticket-comment-success",
+                "decisiongraphadmin",
+                "unifiedsupport"
             ]
         },
         "ext.supportSystem.graphAdmin": {

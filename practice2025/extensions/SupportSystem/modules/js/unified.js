@@ -170,70 +170,6 @@ var selectedSource = '';
         searchState.graphSearchDone = true;
     }
 
-    /**
-     * Поиск с использованием AI
-     * @param {string} query Поисковый запрос
-     */
-    // function searchAI(query) {
-    //     var api = new mw.Api();
-    //     searchState.searchQuery = query || searchState.searchQuery || currentSolution;
-    //     var context = [];
-    //     dialogHistory.forEach(function (item) {
-    //         context.push({
-    //             question: item.nodeId,
-    //             answer: item.selectedOption
-    //         });
-    //     });
-    //     $('#support-ai-loading').show();
-    //     $('#support-ai-content').hide();
-    //     $('#support-ai-container').show();
-    //     $('#support-solution-container').hide();
-    //     api.get({
-    //         action: 'aibridge',
-    //         query: searchState.searchQuery,
-    //         context: JSON.stringify(context),
-    //         format: 'json'
-    //     }).done(function (data) {
-    //         searchState.aiSearchDone = true;
-    //         if (data.ai_result && data.ai_result.success) {
-    //             $('#support-ai-text').text(data.ai_result.answer);
-    //             $('#support-ai-loading').hide();
-    //             $('#support-ai-content').show();
-    //             if (data.ai_result.sources && data.ai_result.sources.length > 0) {
-    //                 var sourcesList = $('#support-ai-sources-list');
-    //                 sourcesList.empty();
-    //                 data.ai_result.sources.forEach(function (source) {
-    //                     var li = $('<li>');
-    //                     if (source.url) {
-    //                         li.append($('<a>')
-    //                             .attr('href', source.url)
-    //                             .attr('target', '_blank')
-    //                             .text(source.title)
-    //                         );
-    //                     } else {li.text(source.title);}
-    //                     sourcesList.append(li);
-    //                 });
-    //                 $('#support-ai-sources').show();
-    //             } else {$('#support-ai-sources').hide();}
-    //             $('#support-ai-ticket-button').show();
-    //         } else {
-    //             $('#support-ai-text').text(data.ai_result && data.ai_result.answer ||
-    //                 getMessage('supportsystem-dt-ai-error', 'An error occurred while processing the AI request.'));
-    //             $('#support-ai-loading').hide();
-    //             $('#support-ai-content').show();
-    //             $('#support-ai-sources').hide();
-    //             $('#support-ai-ticket-button').show();
-    //         }
-    //     }).fail(function () {
-    //         searchState.aiSearchDone = true;
-    //         $('#support-ai-text').text(getMessage('supportsystem-dt-ai-error', 'An error occurred while processing the AI request.'));
-    //         $('#support-ai-loading').hide();
-    //         $('#support-ai-content').show();
-    //         $('#support-ai-sources').hide();
-    //         $('#support-ai-ticket-button').show();
-    //     });
-    // }
-
     function scrollChatToBottom() {
         var container = document.getElementById('support-chat-container');
         if (container) {
@@ -307,45 +243,6 @@ var selectedSource = '';
             );
         });
     }
-
-    /**
-     * Отображение результатов AI поиска
-     * @param {Object} aiResult Результат AI поиска
-     * @param {string} query Поисковый запрос
-     */
-    // function displayAIResult(aiResult, query) {
-    //     var resultsHtml = '<div class="support-ai-result">';
-    //     resultsHtml += '<h3>' + (mw.msg('supportsystem-search-ai-result-title') || 'AI-based Answer') + '</h3>';
-    //     var formattedAnswer = aiResult.answer
-    //         .replace(/\n/g, '<br>')
-    //         .replace(/(\d+\. )/g, '<br>$1');
-    //     resultsHtml += '<div class="support-ai-answer">' + formattedAnswer + '</div>';
-    //     if (aiResult.sources && aiResult.sources.length > 0) {
-    //         resultsHtml += '<div class="support-ai-sources">';
-    //         resultsHtml += '<h4>' + (mw.msg('supportsystem-search-ai-sources') || 'Information Sources') + '</h4>';
-    //         resultsHtml += '<ul>';
-    //         aiResult.sources.forEach(function (source) {
-    //             if (source.url) {
-    //                 resultsHtml += '<li><a href="' + source.url + '" target="_blank">' + source.title + '</a></li>';
-    //             } else {
-    //                 resultsHtml += '<li>' + source.title + '</li>';
-    //             }
-    //         });
-    //         resultsHtml += '</ul></div>';
-    //     }
-    //     resultsHtml += '<div class="support-ai-actions">';
-    //     resultsHtml += '<button class="support-create-ticket-btn support-button-primary" data-solution="' +
-    //         aiResult.answer.replace(/"/g, '&quot;') + '" data-source="ai">' +
-    //         (mw.msg('supportsystem-search-create-ticket-ai') || 'Create ticket with this answer') + '</button>';
-    //     resultsHtml += '</div>';
-    //     resultsHtml += '</div>';
-    //     $('#support-search-results').html(resultsHtml);
-    //     $('.support-create-ticket-btn').on('click', function () {
-    //         var solution = $(this).data('solution');
-    //         var source = $(this).data('source');
-    //         showTicketForm(solution, source);
-    //     });
-    // }
 
     /**
      * Отображение результатов обычного поиска
@@ -726,133 +623,116 @@ var selectedSource = '';
         $('#support-comment-text').val('');
         initFileUpload();
     }
+
     /**
-     * Показать форму создания заявки
+     * Показывает форму создания тикета
      * @param {string} solution Текст решения
      * @param {string} source Источник решения
      */
     function showTicketForm(solution, source) {
         selectedSolution = solution || '';
         selectedSource = source || '';
-        $('#support-ticket-subject').val(getMessage('supportsystem-search-default-subject', 'Help Request'));
+        if ($('#support-ticket-form').length === 0) {
+            var formHtml = `
+            <div id="support-ticket-form" class="support-form-overlay" style="display: none;">
+                <div class="support-form-container">
+                    <div class="support-form-header">
+                        <h3>Создание тикета</h3>
+                        <button id="support-ticket-close" class="support-close-button">&times;</button>
+                    </div>
+                    <div id="support-solution-display" class="support-solution-display" style="display: none;">
+                        <h4>Найденное решение</h4>
+                        <p id="support-solution-text"></p>
+                        <p id="support-solution-source" class="support-source"></p>
+                    </div>
+                    <form id="support-ticket-form-element" enctype="multipart/form-data">
+                        <div class="support-form-group">
+                            <label for="support-ticket-subject">Тема тикета</label>
+                            <input type="text" id="support-ticket-subject" name="subject" class="support-input" required>
+                        </div>
+                        <div class="support-form-group">
+                            <label for="support-ticket-description">Описание проблемы</label>
+                            <textarea id="support-ticket-description" name="description" class="support-textarea" rows="5" required></textarea>
+                        </div>
+                        <div class="support-form-group">
+                            <label for="support-ticket-priority">Приоритет</label>
+                            <select id="support-ticket-priority" name="priority" class="support-select">
+                                <option value="green">Низкий</option>
+                                <option value="yellow" selected>Нормальный</option>
+                                <option value="orange">Высокий</option>
+                                <option value="red">Критический</option>
+                            </select>
+                        </div>
+                        <div class="support-form-group">
+                            <label for="support-ticket-files">Прикрепить файлы</label>
+                            <input type="file" id="support-ticket-files" name="ticket_files[]" class="support-file-input" multiple>
+                            <div id="support-file-list" class="support-file-list"></div>
+                        </div>
+                        <div class="support-form-actions">
+                            <button type="button" id="support-ticket-cancel" class="support-button-secondary">
+                                Отмена
+                            </button>
+                            <button type="submit" id="support-ticket-submit" class="support-button-primary">
+                                Отправить
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+            $('body').append(formHtml);
+            $('#support-ticket-close, #support-ticket-cancel').on('click', function () {
+                $('#support-ticket-form').hide();
+            });
+            $('#support-ticket-form-element').on('submit', function (e) {
+                e.preventDefault();
+                submitTicket();
+            });
+            $('#support-ticket-files').on('change', function () {
+                var fileList = $('#support-file-list');
+                fileList.empty();
+
+                if (this.files && this.files.length > 0) {
+                    var fileNames = '<p><strong>Выбранные файлы:</strong></p><ul>';
+                    for (var i = 0; i < this.files.length; i++) {
+                        var file = this.files[i];
+                        var fileSize = formatFileSize(file.size);
+                        fileNames += '<li>' + file.name + ' (' + fileSize + ')</li>';
+                    }
+                    fileNames += '</ul>';
+                    fileList.html(fileNames);
+                }
+            });
+        }
+        $('#support-ticket-subject').val('Запрос в поддержку');
         if (solution) {
             $('#support-solution-text').text(solution);
-            $('#support-solution-source').text(getMessage('supportsystem-search-source', 'Source: {0}')
-                .replace('{0}', getSourceLabel(source)));
+            $('#support-solution-source').text('Источник: ' + (source || 'неизвестный'));
             $('#support-solution-display').show();
             var description = '';
             if (source === 'dialog') {
-                description = getMessage('supportsystem-dt-dialog-history', 'Dialog History:') + '\n\n';
-                dialogHistory.forEach(function (item, index) {
-                    description += (index + 1) + '. ';
-                    description += getMessage('supportsystem-dt-dialog-item', 'Answer: {0}')
-                        .replace('{0}', item.selectedOption) + '\n';
-                });
-                description += '\n' + getMessage('supportsystem-dt-dialog-solution', 'Found Solution:') + '\n';
-                description += solution;
+                description = 'История диалога:\n\n';
+                if (typeof dialogHistory !== 'undefined' && dialogHistory.length > 0) {
+                    dialogHistory.forEach(function (item, index) {
+                        description += (index + 1) + '. Ответ: ' + item.selectedOption + '\n';
+                    });
+                }
+                description += '\nНайденное решение:\n' + solution;
             } else {
-                description = getMessage('supportsystem-search-default-description', 'I need help with a problem.') + '\n\n';
-                description += getMessage('supportsystem-dt-dialog-solution', 'Found Solution:') + '\n';
-                description += solution;
+                description = 'У меня возникла проблема, требующая помощи.\n\n';
+                description += 'Найденное решение:\n' + solution;
             }
             $('#support-ticket-description').val(description);
         } else {
             $('#support-solution-display').hide();
-            $('#support-ticket-description').val(getMessage('supportsystem-search-default-description', 'I need help with a problem.'));
+            $('#support-ticket-description').val('У меня возникла проблема, требующая помощи.');
         }
+        $('#support-ticket-files').val('');
+        $('#support-file-list').empty();
+        $('#support-ticket-submit').prop('disabled', false);
         $('#support-ticket-form').show();
     }
 
-    function submitTicket() {
-        var subject = $('#support-ticket-subject').val();
-        var description = $('#support-ticket-description').val();
-        var priority = $('#support-ticket-priority').val();
-        if (!subject) {
-            mw.notify(getMessage('supportsystem-sd-ticket-subject-required', 'Требуется указать тему тикета'), { type: 'error' });
-            $('#support-ticket-subject').focus();
-            return;
-        }
-        if (!description) {
-            mw.notify(getMessage('supportsystem-sd-ticket-description-required', 'Требуется указать описание проблемы'), { type: 'error' });
-            $('#support-ticket-description').focus();
-            return;
-        }
-        $('#support-ticket-submit').prop('disabled', true);
-        $('#support-ticket-submit').text(getMessage('supportsystem-dt-submitting', 'Отправка...'));
-        var api = new mw.Api();
-        var url = mw.util.wikiScript('api');
-        var formData = new FormData();
-        formData.append('action', 'supportticket');
-        formData.append('operation', 'create');
-        formData.append('subject', subject);
-        formData.append('description', description);
-        formData.append('priority', priority);
-        formData.append('format', 'json');
-        formData.append('token', mw.user.tokens.get('csrfToken'));
-        var form = document.createElement('form');
-        form.method = 'POST';
-        form.action = url;
-        form.style.display = 'none';
-        document.body.appendChild(form);
-        for (var pair of formData.entries()) {
-            var input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = pair[0];
-            input.value = pair[1];
-            form.appendChild(input);
-        }
-        var iframe = document.createElement('iframe');
-        iframe.name = 'ticket_frame_' + Date.now();
-        iframe.style.display = 'none';
-        document.body.appendChild(iframe);
-        form.target = iframe.name;
-        iframe.onload = function () {
-            try {
-                var iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-                var response = JSON.parse(iframeDoc.body.innerText);
-                if (response && response.ticket) {
-                    if (selectedSolution) { attachSolution(response.ticket.id); }
-                    else { showTicketSuccess(response.ticket.id); }
-                } else {
-                    console.error('Ошибка создания тикета:', response);
-                    $('#support-ticket-form').hide();
-                    loadTickets();
-                    showPanel('tickets');
-                    mw.notify('Проверяем, была ли создана заявка...', { type: 'info' });
-                    $('#support-ticket-submit').prop('disabled', false);
-                    $('#support-ticket-submit').text(getMessage('supportsystem-dt-submit', 'Отправить'));
-                }
-            } catch (e) {
-                console.error('Ошибка обработки ответа:', e);
-                $('#support-ticket-form').hide();
-                loadTickets();
-                showPanel('tickets');
-                mw.notify('Проверяем, была ли создана заявка...', { type: 'info' });
-                $('#support-ticket-submit').prop('disabled', false);
-                $('#support-ticket-submit').text(getMessage('supportsystem-dt-submit', 'Отправить'));
-            }
-
-            setTimeout(function () {
-                document.body.removeChild(form);
-                document.body.removeChild(iframe);
-            }, 100);
-        };
-        iframe.onerror = function () {
-            $('#support-ticket-form').hide();
-            loadTickets();
-            showPanel('tickets');
-            mw.notify('Проверяем, была ли создана заявка...', { type: 'info' });
-            $('#support-ticket-submit').prop('disabled', false);
-            $('#support-ticket-submit').text(getMessage('supportsystem-dt-submit', 'Отправить'));
-
-            setTimeout(function () {
-                document.body.removeChild(form);
-                document.body.removeChild(iframe);
-            }, 100);
-        };
-
-        form.submit();
-    }
 
     /**
      * Прикрепление решения к заявке
@@ -882,6 +762,7 @@ var selectedSource = '';
             });
         });
     }
+
     /**
      * Функция добавления комментария к тикету через curl
      * @param {number} ticketId ID тикета
@@ -916,9 +797,6 @@ var selectedSource = '';
         });
     }
 
-    /**
-     * Функция для инициализации загрузки файлов
-     */
     function initFileUpload() {
         if ($('#support-ticket-details').length && !$('#support-file-upload-form').length) {
             var uploadFormHtml = `
@@ -1026,9 +904,9 @@ var selectedSource = '';
     }
 
     /**
-     * Форматирование размера файла
-     * @param {number} bytes Размер в байтах
-     * @return {string} Отформатированный размер
+     * Format file size for display
+     * @param {number} bytes File size in bytes
+     * @return {string} Formatted file size
      */
     function formatFileSize(bytes) {
         if (bytes < 1024) {
@@ -1042,6 +920,146 @@ var selectedSource = '';
         }
     }
 
+    function submitTicket() {
+        var subject = $('#support-ticket-subject').val();
+        var description = $('#support-ticket-description').val();
+        if (!subject) {
+            mw.notify('Необходимо указать тему тикета', { type: 'error' });
+            $('#support-ticket-subject').focus();
+            return;
+        }
+        if (!description) {
+            mw.notify('Необходимо указать описание проблемы', { type: 'error' });
+            $('#support-ticket-description').focus();
+            return;
+        }
+        $('#support-ticket-submit').prop('disabled', true);
+        $('#support-ticket-submit').text('Отправка...');
+        var form = document.getElementById('support-ticket-form-element');
+        form.setAttribute('enctype', 'multipart/form-data');
+        form.setAttribute('method', 'POST');
+        form.action = mw.util.wikiScript('api');
+        var iframe = document.createElement('iframe');
+        var iframeName = 'ticket_frame_' + Date.now();
+        iframe.name = iframeName;
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+        form.target = iframeName;
+        addHiddenField(form, 'format', 'json');
+        addHiddenField(form, 'action', 'supportticket');
+        addHiddenField(form, 'operation', 'create');
+        addHiddenField(form, 'token', mw.user.tokens.get('csrfToken'));
+        if (selectedSolution) {
+            addHiddenField(form, 'solution', selectedSolution);
+            addHiddenField(form, 'source', selectedSource || 'unknown');
+        }
+        var fileInput = document.getElementById('support-ticket-files');
+        if (fileInput && fileInput.files.length > 0) {
+            $('#support-file-list').html(
+                '<div class="support-upload-progress">' +
+                '<div class="support-spinner"></div>' +
+                '<p>Загрузка файлов...</p>' +
+                '</div>'
+            );
+        }
+        iframe.onload = function () {
+            try {
+                var iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                var responseText = iframeDoc.body.innerText;
+                try {
+                    var response = JSON.parse(responseText);
+                    if (response && response.ticket) {
+                        $('#support-ticket-form').hide();
+                        $('#support-ticket-submit').prop('disabled', false);
+                        $('#support-ticket-submit').text('Отправить');
+                        mw.notify(
+                            'Тикет #' + response.ticket.id + ' успешно создан!',
+                            { type: 'success' }
+                        );
+                        loadTickets();
+                        showPanel('tickets');
+                    } else if (response && response.error) {
+                        mw.notify(
+                            'Ошибка создания тикета: ' + (response.error.info || 'Неизвестная ошибка'),
+                            { type: 'error' }
+                        );
+                        $('#support-ticket-submit').prop('disabled', false);
+                        $('#support-ticket-submit').text('Отправить');
+                        $('#support-file-list').empty();
+                    } else {
+                        console.warn('Неожиданный формат ответа:', response);
+                        $('#support-ticket-form').hide();
+                        loadTickets();
+                        showPanel('tickets');
+                        mw.notify(
+                            'Проверяем, создан ли тикет...',
+                            { type: 'info' }
+                        );
+                        $('#support-ticket-submit').prop('disabled', false);
+                        $('#support-ticket-submit').text('Отправить');
+                    }
+                } catch (e) {
+                    console.error('Ошибка разбора ответа:', e);
+                    $('#support-ticket-form').hide();
+                    loadTickets();
+                    showPanel('tickets');
+                    mw.notify(
+                        'Проверяем, создан ли тикет...',
+                        { type: 'info' }
+                    );
+                    $('#support-ticket-submit').prop('disabled', false);
+                    $('#support-ticket-submit').text('Отправить');
+                }
+            } catch (e) {
+                console.error('Ошибка доступа к содержимому iframe:', e);
+                $('#support-ticket-form').hide();
+                loadTickets();
+                showPanel('tickets');
+                mw.notify(
+                    'Проверяем, создан ли тикет...',
+                    { type: 'info' }
+                );
+                $('#support-ticket-submit').prop('disabled', false);
+                $('#support-ticket-submit').text('Отправить');
+            }
+            setTimeout(function () {
+                document.body.removeChild(iframe);
+            }, 100);
+        };
+        iframe.onerror = function () {
+            $('#support-ticket-form').hide();
+            loadTickets();
+            showPanel('tickets');
+            mw.notify(
+                'Ошибка отправки формы. Проверяем, создан ли тикет...',
+                { type: 'error' }
+            );
+            $('#support-ticket-submit').prop('disabled', false);
+            $('#support-ticket-submit').text('Отправить');
+            setTimeout(function () {
+                document.body.removeChild(iframe);
+            }, 100);
+        };
+        form.submit();
+    }
+
+    /**
+     * Добавляет скрытое поле в форму
+     * @param {HTMLFormElement} form Форма
+     * @param {string} name Имя поля
+     * @param {string} value Значение поля
+     */
+    function addHiddenField(form, name, value) {
+        var field = form.querySelector('input[name="' + name + '"]');
+        if (!field) {
+            field = document.createElement('input');
+            field.type = 'hidden';
+            field.name = name;
+            form.appendChild(field);
+        }
+        field.value = value;
+    }
+
     /**
      * Показать сообщение об успешном создании заявки
      * @param {number} ticketId ID заявки
@@ -1050,6 +1068,8 @@ var selectedSource = '';
         $('#support-ticket-form').hide();
         $('#support-ticket-submit').prop('disabled', false);
         $('#support-ticket-submit').text(mw.msg('supportsystem-dt-submit') || 'Submit');
+        $('#support-ticket-files').val('');
+        $('#support-file-list').empty();
         mw.notify(
             (messages.ticket_created || 'Ticket #{0} has been successfully created!').replace('{0}', ticketId),
             { type: 'success', autoHide: false }
@@ -1070,31 +1090,5 @@ var selectedSource = '';
             return date.toLocaleString();
         } catch (e) { return dateStr; }
     }
-
-    /**
-     * Вспомогательная функция для получения текста сообщения
-     * @param {string} key Ключ сообщения
-     * @param {string} defaultValue Значение по умолчанию
-     * @return {string} Текст сообщения
-     */
-    function getMessage(key, defaultValue) {
-        if (typeof mw !== 'undefined' && mw.msg) {
-            var message = mw.msg(key);
-            if (message.indexOf('⧼') === 0 && message.indexOf('⧽') === message.length - 1) {
-                return defaultValue;
-            }
-            return message;
-        }
-        return defaultValue;
-    }
-    $(document).ajaxError(function (event, jqXHR) {
-        if (jqXHR.status === 0) {
-            mw.notify("Проблема с подключением к серверу. Проверьте соединение и попробуйте снова.",
-                { type: "error", autoHide: false });
-        } else if (jqXHR.status >= 500) {
-            mw.notify("Ошибка сервера (HTTP " + jqXHR.status + ").",
-                { type: "error", autoHide: false });
-        }
-    });
     $(init);
 }());

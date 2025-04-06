@@ -20,37 +20,34 @@ class ApiSupportAttachment extends ApiBase
         $this->requireLogin();
         $params = $this->extractRequestParams();
         $operation = $params['operation'];
-
         try {
             $serviceDesk = new ServiceDesk();
-
             switch ($operation) {
                 case 'upload':
                     $this->requirePostedParameters(['ticket_id']);
                     $request = $this->getRequest();
-
-                    // Check if file exists in request
+                    $ticketId = $params['ticket_id'];
+                    $comment = $params['comment'];
+                    wfDebugLog('SupportSystem', "API: Starting file upload to ticket #$ticketId");
                     if (!$request->getUpload('file')) {
+                        wfDebugLog('SupportSystem', "API: No file uploaded in request");
                         $this->dieWithError('No file uploaded', 'no_file');
                     }
-
                     $tmpName = $request->getFileTempname('file');
                     $originalName = $request->getFileName('file');
                     $fileSize = $request->getFileSize('file');
                     $fileType = $request->getUploadMimeType('file');
-
+                    wfDebugLog('SupportSystem', "API: Received file - name: $originalName, size: $fileSize, type: $fileType, tmp: $tmpName");
                     if (!$tmpName || !$originalName) {
+                        wfDebugLog('SupportSystem', "API: Invalid file upload - tmpName or originalName is empty");
                         $this->dieWithError('Invalid file upload', 'invalid_file');
                     }
-
                     if ($fileSize <= 0) {
+                        wfDebugLog('SupportSystem', "API: Empty file uploaded - size: $fileSize");
                         $this->dieWithError('Empty file uploaded', 'empty_file');
                     }
-
-                    $ticketId = $params['ticket_id'];
-                    $comment = $params['comment'];
-
                     try {
+                        wfDebugLog('SupportSystem', "API: Attempting to attach file to ticket #$ticketId");
                         $result = $serviceDesk->attachFileToTicket(
                             $ticketId,
                             $tmpName,
@@ -58,22 +55,24 @@ class ApiSupportAttachment extends ApiBase
                             $fileType,
                             $comment
                         );
-
                         if ($result) {
+                            wfDebugLog('SupportSystem', "API: File successfully attached to ticket #$ticketId");
                             $this->getResult()->addValue(null, 'result', 'success');
                             $this->getResult()->addValue(null, 'message', 'File attached successfully');
                         } else {
+                            wfDebugLog('SupportSystem', "API: Failed to attach file to ticket #$ticketId");
                             $this->dieWithError('Failed to attach file', 'attach_failed');
                         }
                     } catch (MWException $e) {
+                        wfDebugLog('SupportSystem', "API: Exception when attaching file: " . $e->getMessage());
                         $this->dieWithError($e->getMessage(), 'attach_error');
                     }
                     break;
-
                 default:
                     $this->dieWithError(['apierror-invalidparameter', 'operation']);
             }
         } catch (MWException $e) {
+            wfDebugLog('SupportSystem', "API: General exception: " . $e->getMessage());
             $this->dieWithError($e->getMessage(), 'api_error');
         }
     }
