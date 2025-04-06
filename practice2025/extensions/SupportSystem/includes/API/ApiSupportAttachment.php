@@ -7,14 +7,8 @@ use MediaWiki\Extension\SupportSystem\ServiceDesk;
 use MWException;
 use Wikimedia\ParamValidator\ParamValidator;
 
-/**
- * API модуль для загрузки файлов в тикеты
- */
 class ApiSupportAttachment extends ApiBase
 {
-    /**
-     * Выполнение API модуля
-     */
     public function execute()
     {
         $this->requireLogin();
@@ -44,10 +38,7 @@ class ApiSupportAttachment extends ApiBase
                     if ($fileSize <= 0) {
                         $this->dieWithError('Empty file uploaded', 'empty_file');
                     }
-
-                    // Загрузка файла в Redmine
                     try {
-                        // Вызываем упрощенный метод для загрузки и прикрепления файла к тикету
                         $result = $serviceDesk->attachFileToTicket(
                             $ticketId,
                             $tmpName,
@@ -55,7 +46,6 @@ class ApiSupportAttachment extends ApiBase
                             $fileType,
                             $comment
                         );
-
                         if ($result) {
                             $this->getResult()->addValue(null, 'result', 'success');
                             $this->getResult()->addValue(null, 'message', 'File attached successfully');
@@ -66,7 +56,6 @@ class ApiSupportAttachment extends ApiBase
                         $this->dieWithError($e->getMessage(), 'attach_error');
                     }
                     break;
-
                 default:
                     $this->dieWithError(['apierror-invalidparameter', 'operation']);
             }
@@ -74,11 +63,6 @@ class ApiSupportAttachment extends ApiBase
             $this->dieWithError($e->getMessage(), 'api_error');
         }
     }
-
-    /**
-     * Получение допустимых параметров
-     * @return array
-     */
     public function getAllowedParams()
     {
         return [
@@ -97,20 +81,10 @@ class ApiSupportAttachment extends ApiBase
             ],
         ];
     }
-
-    /**
-     * Указывает, что этот модуль требует режима записи
-     * @return bool
-     */
     public function isWriteMode()
     {
         return true;
     }
-
-    /**
-     * Указывает, что этот модуль требует использования POST
-     * @return bool
-     */
     public function mustBePosted()
     {
         return true;

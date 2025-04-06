@@ -6,24 +6,14 @@ use ApiBase;
 use MediaWiki\Extension\SupportSystem\ServiceDesk;
 use MWException;
 
-/**
- * API module for ticket management
- */
 class ApiSupportTicket extends ApiBase
 {
-    /**
-     * Execute the API module
-     */
     public function execute()
     {
         $params = $this->extractRequestParams();
         $operation = $params['operation'];
-
         try {
-            // Создаем экземпляр ServiceDesk для работы с Redmine
             $serviceDesk = new ServiceDesk();
-
-            // Обрабатываем разные операции
             switch ($operation) {
                 case 'create':
                     $this->requirePostedParameters(['subject', 'description']);
@@ -60,23 +50,19 @@ class ApiSupportTicket extends ApiBase
                         $this->dieWithError('supportsystem-error-ticket-not-found');
                     }
                     break;
-
                 case 'list':
                     $limit = $params['limit'];
                     $offset = $params['offset'];
                     $tickets = $serviceDesk->getAllTickets($limit, $offset);
                     $this->getResult()->addValue(null, 'tickets', $tickets);
                     break;
-
                 case 'comment':
                     $this->requirePostedParameters(['ticket_id', 'comment']);
                     $ticketId = $params['ticket_id'];
                     $comment = $params['comment'];
-
                     if (!$ticketId) {
                         $this->dieWithError(['apierror-invalidparameter', 'ticket_id']);
                     }
-
                     $success = $serviceDesk->addComment($ticketId, $comment);
                     if ($success) {
                         $this->getResult()->addValue(null, 'result', 'success');
@@ -84,17 +70,14 @@ class ApiSupportTicket extends ApiBase
                         $this->dieWithError('supportsystem-error-add-comment-failed');
                     }
                     break;
-
                 case 'solution':
                     $this->requirePostedParameters(['ticket_id', 'solution']);
                     $ticketId = $params['ticket_id'];
                     $solution = $params['solution'];
                     $source = $params['source'];
-
                     if (!$ticketId) {
                         $this->dieWithError(['apierror-invalidparameter', 'ticket_id']);
                     }
-
                     $success = $serviceDesk->attachSolution($ticketId, $solution, $source);
                     if ($success) {
                         $this->getResult()->addValue(null, 'result', 'success');
@@ -102,7 +85,6 @@ class ApiSupportTicket extends ApiBase
                         $this->dieWithError('supportsystem-error-attach-solution-failed');
                     }
                     break;
-
                 default:
                     $this->dieWithError(['apierror-invalidparameter', 'operation']);
             }
@@ -111,11 +93,6 @@ class ApiSupportTicket extends ApiBase
             $this->dieWithError($e->getMessage());
         }
     }
-
-    /**
-     * Get allowed parameters
-     * @return array
-     */
     public function getAllowedParams()
     {
         return [

@@ -11,22 +11,15 @@ use Wikimedia\ParamValidator\ParamValidator;
  */
 class ApiSupportGraphAdmin extends ApiBase
 {
-    /**
-     * Execute the API module
-     */
     public function execute()
     {
-        // Check permissions
         if (!$this->getUser()->isAllowed('edit')) {
             $this->dieWithError('You do not have permission to edit the decision graph', 'permissiondenied');
             return;
         }
-
         $params = $this->extractRequestParams();
         $action = $params['graphaction'];
-
         $graph = new DecisionGraph();
-
         switch ($action) {
             case 'get':
                 $graphData = $graph->getGraph();
