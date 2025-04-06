@@ -22,7 +22,6 @@ class ApiSupportTicket extends ApiBase
                     $priority = $params['priority'];
                     $assignedTo = $params['assigned_to'] ?? null;
                     wfDebugLog('SupportSystem', "API: создание тикета: $subject, приоритет: $priority");
-
                     try {
                         $ticket = $serviceDesk->createTicket(
                             $subject,
@@ -36,7 +35,6 @@ class ApiSupportTicket extends ApiBase
                         $this->dieWithError($e->getMessage());
                     }
                     break;
-
                 case 'get':
                     $ticketId = $params['ticket_id'];
                     if (!$ticketId) {

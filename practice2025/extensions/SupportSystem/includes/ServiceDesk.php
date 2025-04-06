@@ -16,12 +16,6 @@ class ServiceDesk
     /** @var string The Redmine API key */
     private $apiKey;
 
-    /** @var int Max retry attempts */
-    private $maxRetryAttempts = 3;
-
-    /** @var int Retry delay in seconds */
-    private $retryDelay = 2;
-
     /**
      * Constructor
      */
@@ -30,11 +24,10 @@ class ServiceDesk
         $config = MediaWikiServices::getInstance()->getMainConfig();
         $this->apiUrl = $config->get('SupportSystemRedmineURL');
         $this->apiKey = $config->get('SupportSystemRedmineAPIKey');
-        wfDebugLog('SupportSystem', "ServiceDesk initialized with URL: {$this->apiUrl}");
     }
 
     /**
-     * Create a ticket in Redmine using PHP curl extension
+     * Create a ticket in Redmine using curl
      * 
      * @param string $subject Ticket subject
      * @param string $description Ticket description
@@ -46,7 +39,6 @@ class ServiceDesk
      */
     public function createTicket(string $subject, string $description, string $priority = 'yellow', int $assignedTo = null, int $projectId = 1): array
     {
-        wfDebugLog('SupportSystem', "Creating ticket: '$subject', priority: $priority");
         $priorityId = $this->getPriorityId($priority);
         $issueData = [
             'issue' => [
@@ -58,60 +50,27 @@ class ServiceDesk
                 'status_id' => 1
             ]
         ];
+
         if ($assignedTo) {
             $issueData['issue']['assigned_to_id'] = $assignedTo;
         }
+
         $url = rtrim($this->apiUrl, '/') . "/issues.json";
-        wfDebugLog('SupportSystem', "Request URL: $url");
-        wfDebugLog('SupportSystem', "Request data: " . json_encode($issueData));
-        $attempts = 0;
-        $lastError = null;
-        while ($attempts < $this->maxRetryAttempts) {
-            try {
-                wfDebugLog('SupportSystem', "Attempt " . ($attempts + 1) . " to create ticket using PHP curl");
-                $ch = curl_init($url);
-                $jsonData = json_encode($issueData);
-                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
-                curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonData);
-                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                    'Content-Type: application/json',
-                    'X-Redmine-API-Key: ' . $this->apiKey,
-                    'Content-Length: ' . strlen($jsonData)
-                ]);
-                $response = curl_exec($ch);
-                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                $curlError = curl_error($ch);
-                curl_close($ch);
-                wfDebugLog('SupportSystem', "Response HTTP code: $httpCode");
-                wfDebugLog('SupportSystem', "Response: " . substr($response, 0, 500));
-                if ($curlError) {
-                    throw new MWException("cURL error: $curlError");
-                }
-                if ($httpCode >= 400) {
-                    throw new MWException("HTTP error $httpCode: $response");
-                }
-                if (!$response) {
-                    throw new MWException("Empty response from Redmine API");
-                }
-                $data = json_decode($response, true);
-                if (!isset($data['issue'])) {
-                    throw new MWException("Invalid response format from Redmine API: " . substr($response, 0, 200));
-                }
-                wfDebugLog('SupportSystem', "Ticket created successfully, ID: " . $data['issue']['id']);
-                return $data['issue'];
-            } catch (MWException $e) {
-                $lastError = $e;
-                wfDebugLog('SupportSystem', "Exception in createTicket: " . $e->getMessage());
-                $attempts++;
-                if ($attempts < $this->maxRetryAttempts) {
-                    sleep($this->retryDelay);
-                    continue;
-                }
-            }
+        $jsonData = json_encode($issueData);
+
+        $command = "curl -s -X POST -H \"Content-Type: application/json\" -H \"X-Redmine-API-Key: {$this->apiKey}\" -d " . escapeshellarg($jsonData) . " \"$url\"";
+        $response = shell_exec($command);
+
+        if (!$response) {
+            throw new MWException("Empty response from Redmine API");
         }
-        throw new MWException("Failed to create ticket after {$this->maxRetryAttempts} attempts: " .
-            ($lastError ? $lastError->getMessage() : "Unknown error"));
+
+        $data = json_decode($response, true);
+        if (!isset($data['issue'])) {
+            throw new MWException("Invalid response format from Redmine API");
+        }
+
+        return $data['issue'];
     }
 
     /**
@@ -122,16 +81,15 @@ class ServiceDesk
      */
     private function getPriorityId(string $priorityName): int
     {
-        // Приоритеты в Redmine
         $priorities = [
-            'red' => 1,     // Высший приоритет
-            'orange' => 2,  // Высокий приоритет
-            'yellow' => 3,  // Нормальный приоритет
-            'green' => 4    // Низкий приоритет
+            'red' => 1,     // High
+            'orange' => 2,  // Urgent
+            'yellow' => 3,  // Normal
+            'green' => 4    // Low
         ];
 
         $priorityName = strtolower($priorityName);
-        return $priorities[$priorityName] ?? 3; // По умолчанию Yellow (нормальный)
+        return $priorities[$priorityName] ?? 3; // Default to Normal
     }
 
     /**
@@ -142,31 +100,21 @@ class ServiceDesk
      */
     public function getTicket(int $ticketId): ?array
     {
-        wfDebugLog('SupportSystem', "Getting ticket #$ticketId");
-        $url = rtrim($this->apiUrl, '/') . "/issues/{$ticketId}.json?include=journals";
+        $url = rtrim($this->apiUrl, '/') . "/issues/{$ticketId}.json?include=journals,attachments";
 
-        try {
-            $command = "curl -s -H \"X-Redmine-API-Key: {$this->apiKey}\" \"$url\"";
-            wfDebugLog('SupportSystem', "Executing command: $command");
-            $response = shell_exec($command);
+        $command = "curl -s -H \"X-Redmine-API-Key: {$this->apiKey}\" \"$url\"";
+        $response = shell_exec($command);
 
-            if (!$response) {
-                wfDebugLog('SupportSystem', "Error getting ticket #$ticketId: empty response");
-                return null;
-            }
-
-            $data = json_decode($response, true);
-            if (!isset($data['issue'])) {
-                wfDebugLog('SupportSystem', "Invalid response format for ticket #$ticketId");
-                return null;
-            }
-
-            wfDebugLog('SupportSystem', "Successfully got ticket #$ticketId");
-            return $data['issue'];
-        } catch (\Exception $e) {
-            wfDebugLog('SupportSystem', "Exception getting ticket #$ticketId: " . $e->getMessage());
+        if (!$response) {
             return null;
         }
+
+        $data = json_decode($response, true);
+        if (!isset($data['issue'])) {
+            return null;
+        }
+
+        return $data['issue'];
     }
 
     /**
@@ -178,29 +126,23 @@ class ServiceDesk
      */
     public function addComment(int $ticketId, string $comment): bool
     {
-        wfDebugLog('SupportSystem', "Adding comment to ticket #$ticketId");
         $issueData = [
             'issue' => [
                 'notes' => $comment
             ]
         ];
+
         $url = rtrim($this->apiUrl, '/') . "/issues/{$ticketId}.json";
-        try {
-            $jsonData = json_encode($issueData);
-            $command = "curl -s -X PUT \"$url\" -H \"Content-Type: application/json\" -H \"X-Redmine-API-Key: {$this->apiKey}\" -d .addslashes($jsonData)";
-            $response = shell_exec($command);
-            $exitCode = shell_exec("echo $?");
-            if ($exitCode != '0') {
-                wfDebugLog('SupportSystem', "Error adding comment to ticket #$ticketId: non-zero exit code");
-                return false;
-            }
-            wfDebugLog('SupportSystem', "Comment added to ticket #$ticketId");
-            return true;
-        } catch (\Exception $e) {
-            wfDebugLog('SupportSystem', "Exception adding comment: " . $e->getMessage());
-            return false;
-        }
+        $jsonData = json_encode($issueData);
+
+        $command = "curl -s -X PUT -H \"Content-Type: application/json\" -H \"X-Redmine-API-Key: {$this->apiKey}\" -d " . escapeshellarg($jsonData) . " \"$url\"";
+        $response = shell_exec($command);
+
+        // If we received any response, consider it successful
+        // (Redmine returns 204 No Content on successful updates)
+        return $response !== false;
     }
+
     /**
      * Get all tickets
      * 
@@ -210,96 +152,90 @@ class ServiceDesk
      */
     public function getAllTickets(int $limit = 25, int $offset = 0): array
     {
-        wfDebugLog('SupportSystem', "Getting all tickets (limit: $limit, offset: $offset)");
         $url = rtrim($this->apiUrl, '/') . "/issues.json?limit=$limit&offset=$offset";
 
-        try {
-            $command = "curl -s -H \"X-Redmine-API-Key: {$this->apiKey}\" \"$url\"";
-            wfDebugLog('SupportSystem', "Executing command: $command");
-            $response = shell_exec($command);
+        $command = "curl -s -H \"X-Redmine-API-Key: {$this->apiKey}\" \"$url\"";
+        $response = shell_exec($command);
 
-            if (!$response) {
-                wfDebugLog('SupportSystem', "Error getting tickets: empty response");
-                return [];
-            }
-
-            $data = json_decode($response, true);
-            if (!isset($data['issues'])) {
-                wfDebugLog('SupportSystem', "Invalid response format for tickets list");
-                return [];
-            }
-
-            wfDebugLog('SupportSystem', "Got " . count($data['issues']) . " tickets");
-            return $data['issues'];
-        } catch (\Exception $e) {
-            wfDebugLog('SupportSystem', "Exception getting tickets: " . $e->getMessage());
+        if (!$response) {
             return [];
         }
+
+        $data = json_decode($response, true);
+        if (!isset($data['issues'])) {
+            return [];
+        }
+
+        return $data['issues'];
     }
+
     /**
-     * Upload a file to Redmine and get an upload token
+     * Upload a file to Redmine and get upload token
      * 
      * @param string $filePath Path to the file
      * @param string $fileName Optional filename (if different from the actual file)
-     * @param string $contentType Content type of the file
      * @return string Upload token
      * @throws MWException When upload fails
      */
-    public function uploadFile(string $filePath, string $fileName = '', string $contentType = ''): string
+    public function uploadFile(string $filePath, string $fileName = ''): string
     {
-        wfDebugLog('SupportSystem', "Загрузка файла: $filePath");
         if (!file_exists($filePath)) {
-            throw new MWException("Файл не найден: $filePath");
+            throw new MWException("File not found: $filePath");
         }
+
         $url = rtrim($this->apiUrl, '/') . "/uploads.json";
+
         if (empty($fileName)) {
             $fileName = basename($filePath);
         }
-        if (empty($contentType)) {
-            $finfo = new \finfo(FILEINFO_MIME_TYPE);
-            $contentType = $finfo->file($filePath);
+
+        // Simple curl command for file upload
+        $command = "curl -s -X POST -H \"Content-Type: application/octet-stream\" " .
+            "-H \"X-Redmine-API-Key: {$this->apiKey}\" " .
+            "--data-binary @" . escapeshellarg($filePath) . " " .
+            "\"$url?filename=" . urlencode($fileName) . "\"";
+
+        $response = shell_exec($command);
+
+        if (!$response) {
+            throw new MWException("Empty response from Redmine API when uploading file");
         }
-        $command = 'curl -s -X POST ' .
-            '-H "Content-Type: application/octet-stream" ' .
-            '-H "X-Redmine-API-Key: ' . $this->apiKey . '" ' .
-            '--data-binary @' . escapeshellarg($filePath) . ' ' .
-            '"' . $url . '?filename=' . urlencode($fileName) . '"';
-        exec($command, $output, $exitCode);
-        if ($exitCode !== 0) {
-            throw new MWException("Ошибка выполнения curl команды для загрузки файла");
-        }
-        $response = implode('', $output);
+
         $data = json_decode($response, true);
         if (!isset($data['upload']) || !isset($data['upload']['token'])) {
-            throw new MWException("Недопустимый формат ответа от Redmine API: " . substr($response, 0, 200));
+            throw new MWException("Invalid response format from Redmine API");
         }
-        $token = $data['upload']['token'];
-        wfDebugLog('SupportSystem', "Файл успешно загружен, токен: $token");
-        return $token;
+
+        return $data['upload']['token'];
     }
+
     /**
      * Attach a file to an existing ticket
      * 
      * @param int $ticketId Ticket ID
      * @param string $filePath Path to the file
-     * @param string $fileName Optional filename (if different from the actual file)
+     * @param string $fileName Optional filename
      * @param string $contentType Content type of the file
      * @param string $comment Optional comment to add with the attachment
      * @return bool Success status
-     * @throws MWException When attachment fails
+     * @throws MWException On error
      */
     public function attachFileToTicket(int $ticketId, string $filePath, string $fileName = '', string $contentType = '', string $comment = ''): bool
     {
-        wfDebugLog('SupportSystem', "Прикрепление файла к тикету #$ticketId: $filePath");
         try {
-            $token = $this->uploadFile($filePath, $fileName, $contentType);
+            // Step 1: Upload file and get token
+            $token = $this->uploadFile($filePath, $fileName);
+
+            // Step 2: Update issue with uploaded file token
             if (empty($fileName)) {
                 $fileName = basename($filePath);
             }
+
             if (empty($contentType)) {
                 $finfo = new \finfo(FILEINFO_MIME_TYPE);
                 $contentType = $finfo->file($filePath);
             }
+
             $issueData = [
                 'issue' => [
                     'notes' => $comment ?: 'Файл прикреплен',
@@ -312,20 +248,20 @@ class ServiceDesk
                     ]
                 ]
             ];
+
+            $url = rtrim($this->apiUrl, '/') . "/issues/{$ticketId}.json";
             $jsonData = json_encode($issueData);
-            $command = 'curl -s -X PUT ' .
-                '-H "Content-Type: application/json" ' .
-                '-H "X-Redmine-API-Key: ' . $this->apiKey . '" ' .
-                '-d ' . escapeshellarg($jsonData) . ' ' .
-                '"' . rtrim($this->apiUrl, '/') . "/issues/$ticketId.json" . '"';
-            exec($command, $output, $exitCode);
-            if ($exitCode !== 0) {
-                throw new MWException("Ошибка выполнения curl команды для прикрепления файла");
-            }
-            wfDebugLog('SupportSystem', "Файл успешно прикреплен к тикету #$ticketId");
+
+            // Single curl command to attach file to ticket
+            $command = "curl -s -X PUT -H \"Content-Type: application/json\" " .
+                "-H \"X-Redmine-API-Key: {$this->apiKey}\" " .
+                "-d " . escapeshellarg($jsonData) . " \"$url\"";
+
+            $response = shell_exec($command);
+
+            // Redmine returns 204 No Content on successful updates
             return true;
         } catch (MWException $e) {
-            wfDebugLog('SupportSystem', "Ошибка в attachFileToTicket: " . $e->getMessage());
             throw $e;
         }
     }
@@ -340,8 +276,36 @@ class ServiceDesk
      */
     public function attachSolution(int $ticketId, string $solutionText, string $source = 'unknown'): bool
     {
-        wfDebugLog('SupportSystem', "Attaching solution to ticket #$ticketId");
         $comment = "Найденное решение: {$solutionText}\n\nИсточник: {$source}";
         return $this->addComment($ticketId, $comment);
+    }
+
+    /**
+     * Add a custom field to a ticket
+     * 
+     * @param int $ticketId Ticket ID
+     * @param int $customFieldId Custom field ID
+     * @param string|array $value Custom field value
+     * @return bool Whether adding the custom field was successful
+     */
+    public function addCustomField(int $ticketId, int $customFieldId, $value): bool
+    {
+        $issueData = [
+            'issue' => [
+                'custom_fields' => [
+                    [
+                        'id' => $customFieldId,
+                        'value' => $value
+                    ]
+                ]
+            ]
+        ];
+
+        $url = rtrim($this->apiUrl, '/') . "/issues/{$ticketId}.json";
+        $jsonData = json_encode($issueData);
+
+        $command = "curl -s -X PUT -H \"Content-Type: application/json\" -H \"X-Redmine-API-Key: {$this->apiKey}\" -d " . escapeshellarg($jsonData) . " \"$url\"";
+        $response = shell_exec($command);
+        return $response !== false;
     }
 }

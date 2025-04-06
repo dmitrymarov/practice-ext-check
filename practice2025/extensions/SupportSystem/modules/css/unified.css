@@ -54,26 +54,24 @@
     color: #333;
 }
 
-/* Кнопки */
 .support-button-primary,
 .support-button-secondary,
 .support-button-accent {
-    padding: 8px 16px;
+    padding: 6px 12px;
     border-radius: 4px;
-    cursor: pointer;
     font-weight: 500;
-    transition: background-color 0.3s, color 0.3s;
-    margin-right: 10px;
+    cursor: pointer;
+    border: none;
+    transition: background-color 0.2s;
 }
 
 .support-button-primary {
-    background-color: #3366cc;
-    color: #fff;
-    border: none;
+    background-color: #007bff;
+    color: white;
 }
 
 .support-button-primary:hover {
-    background-color: #254e9c;
+    background-color: #0069d9;
 }
 
 .support-button-secondary {
@@ -83,7 +81,7 @@
 }
 
 .support-button-secondary:hover {
-    background-color: #e6e6e6;
+    background-color: #e2e6ea;
 }
 
 .support-button-accent {
@@ -349,7 +347,6 @@
     margin-left: 5px;
 }
 
-/* Индикатор загрузки */
 .support-loading {
     text-align: center;
     padding: 30px;
@@ -357,19 +354,17 @@
 
 .support-spinner {
     display: inline-block;
-    width: 50px;
-    height: 50px;
+    width: 30px;
+    height: 30px;
     border: 3px solid rgba(0, 0, 0, 0.1);
     border-radius: 50%;
-    border-top-color: #3366cc;
+    border-top-color: #007bff;
     animation: spin 1s ease-in-out infinite;
-    margin-bottom: 15px;
+    margin-bottom: 10px;
 }
 
 @keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
+    to { transform: rotate(360deg); }
 }
 
 .support-error {
@@ -417,46 +412,68 @@
     align-items: center;
 }
 
-/* Статусы заявок */
 .support-status-new {
     background-color: #17a2b8;
     color: white;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.9em;
 }
 
-.support-status-in-progress {
-    background-color: #3366cc;
+.support-status-in-progress  {
+    background-color: #007bff;
     color: white;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.9em;
 }
 
 .support-status-resolved {
     background-color: #28a745;
     color: white;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.9em;
 }
 
 .support-status-closed {
     background-color: #6c757d;
     color: white;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.9em;
 }
 
-/* Приоритеты заявок */
 .support-priority-green {
     background-color: #6c757d;
     color: white;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.9em;
 }
 
 .support-priority-normal {
-    background-color: #3366cc;
-    color: white;
+    background-color: #ffc107;
+    color: #333;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.9em;
 }
 
 .support-priority-orange {
-    background-color: #ffc107;
-    color: #333;
+    background-color: #fd7e14;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.9em;
 }
 
 .support-priority-red {
     background-color: #dc3545;
     color: white;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.9em;
 }
 
 .support-ticket-date {
@@ -468,45 +485,98 @@
 .support-ticket-details {
     background-color: white;
     border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 20px;
+    border-radius: 4px;
+    padding: 15px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .support-ticket-details-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
+    margin-bottom: 15px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #e5e5e5;
+}
+
+.support-ticket-details-header h3 {
+    margin: 0;
+    font-size: 1.2em;
+    font-weight: 600;
+    color: #333;
 }
 
 .support-ticket-details-info {
     display: flex;
     flex-wrap: wrap;
-    margin-bottom: 20px;
-    padding: 15px;
     background-color: #f8f9fa;
-    border-radius: 8px;
+    border-radius: 4px;
+    padding: 8px 12px;
+    margin-bottom: 15px;
 }
 
 .support-ticket-details-info>div {
-    margin-right: 20px;
-    margin-bottom: 10px;
+    margin-right: 15px;
+    margin-bottom: 5px;
 }
 
 .support-label {
-    font-weight: bold;
-    margin-right: 5px;
+    font-weight: 600;
+    color: #444;
 }
 
 .support-ticket-description-section,
+.support-custom-fields-section,
+.support-ticket-attachments-section,
+.support-file-upload-section,
 .support-ticket-comments-section {
     margin-bottom: 20px;
 }
 
-.support-ticket-description-content {
-    padding: 15px;
+.support-ticket-description-section h4,
+.support-custom-fields-section h4,
+.support-ticket-attachments-section h4,
+.support-file-upload-section h4,
+.support-ticket-comments-section h4 {
+    font-size: 1.1em;
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: #444;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 5px;
+}
+
+.support-custom-fields-section {
     background-color: #f8f9fa;
-    border-radius: 8px;
+    border-radius: 4px;
+    padding: 10px;
+}
+
+.support-custom-fields-section dl {
+    margin: 0;
+}
+
+.support-custom-fields-section dt {
+    font-weight: 600;
+    margin-top: 5px;
+    color: #555;
+}
+
+.support-custom-fields-section dd {
+    margin-left: 15px;
+    margin-bottom: 5px;
+}
+
+.support-file-upload-section {
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    padding: 10px;
+}
+
+.support-ticket-description-content {
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    padding: 10px;
     white-space: pre-wrap;
 }
 
@@ -516,28 +586,28 @@
 
 .support-comment {
     background-color: #f8f9fa;
-    border-left: 4px solid #ddd;
-    padding: 15px;
-    margin-bottom: 15px;
-    border-radius: 0 8px 8px 0;
+    border-left: 3px solid #007bff;
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 0 4px 4px 0;
 }
 
 .support-comment-content {
     white-space: pre-wrap;
-    margin-bottom: 10px;
+    margin-bottom: 5px;
 }
 
-.support-comment-meta {
-    text-align: right;
+.support-no-comments {
     color: #666;
-    font-size: 0.9em;
+    font-style: italic;
+    text-align: center;
+    padding: 15px;
 }
 
 .support-comment-form {
-    margin-top: 20px;
+    margin-top: 15px;
 }
 
-/* Форма заявки */
 .support-form-overlay {
     position: fixed;
     top: 0;
@@ -605,6 +675,16 @@
     font-size: 14px;
 }
 
+.support-textarea {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    resize: vertical;
+    min-height: 80px;
+    margin-bottom: 10px;
+}
+
 .support-form-actions {
     display: flex;
     justify-content: flex-end;
@@ -617,48 +697,38 @@
     margin-top: 5px;
 }
 
-/* Styles for file attachments */
-
-.support-file-upload-section {
-    margin-bottom: 20px;
-    padding: 15px;
-    background-color: #f8f9fa;
-    border-radius: 8px;
-}
-
 .support-file-input {
     width: 100%;
-    padding: 10px;
+    padding: 5px;
     margin-bottom: 10px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
 }
 
 .support-upload-progress {
     text-align: center;
-    padding: 30px;
-}
-
-.support-ticket-attachments-section {
-    margin-bottom: 20px;
-}
-
-.support-attachments-list {
-    background-color: #f8f9fa;
-    border-radius: 8px;
     padding: 15px;
 }
 
-.support-attachment-item {
-    margin-bottom: 10px;
-    padding: 8px;
-    background-color: #fff;
+
+.support-attachments-list {
+    background-color: #f8f9fa;
     border-radius: 4px;
-    border: 1px solid #ddd;
+    padding: 10px;
+}
+
+.support-attachment-item {
+    margin-bottom: 5px;
+    padding: 5px 8px;
+    background-color: white;
+    border: 1px solid #e5e5e5;
+    border-radius: 3px;
 }
 
 .support-attachment-link {
-    display: block;
     text-decoration: none;
-    color: #3366cc;
+    color: #007bff;
+    display: block;
 }
 
 .support-attachment-icon {
@@ -669,7 +739,7 @@
     text-decoration: underline;
 }
 
-/* Адаптивный дизайн */
+
 @media (max-width: 768px) {
     .support-tabs {
         flex-direction: column;
@@ -708,10 +778,6 @@
     .support-ai-actions>* {
         margin-top: 10px;
         width: 100%;
-    }
-
-    .support-ticket-details-info {
-        flex-direction: column;
     }
 
     .support-form-container {

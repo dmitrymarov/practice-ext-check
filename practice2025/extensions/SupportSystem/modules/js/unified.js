@@ -103,27 +103,18 @@ var selectedSource = '';
      */
     function loadNode(nodeId) {
         var api = new mw.Api();
-
         api.get({
             action: 'supportnode',
             node_id: nodeId
         }).done(function (data) {
             currentNodeId = data.supportnode.id;
-
-            // Добавить системное сообщение в чат
             addMessage(data.supportnode.content, 'system');
-
-            // Обработка узла в зависимости от типа
             if (data.supportnode.type === 'question') {
-                // Показать опции для вопроса
                 showOptions(data.supportnode.children);
             } else {
-                // Показать решение
                 currentSolution = data.supportnode.content;
                 showSolution(data.supportnode.content);
             }
-
-            // Прокрутить чат вниз
             scrollChatToBottom();
         }).fail(function () {
             mw.notify(messages.error_loading_node || 'Error loading node', { type: 'error' });
@@ -139,13 +130,11 @@ var selectedSource = '';
         var className = sender === 'system' ? 'support-system-message' : 'support-user-message';
         var align = sender === 'system' ? 'left' : 'right';
         var bubbleClass = sender === 'system' ? 'support-system-bubble' : 'support-user-bubble';
-
         var html = '<div class="' + className + '">' +
             '<div class="support-message-align-' + align + '">' +
             '<div class="' + bubbleClass + '">' + text + '</div>' +
             '</div>' +
             '</div>';
-
         $('#support-chat-container').append(html);
     }
 
@@ -156,7 +145,6 @@ var selectedSource = '';
     function showOptions(options) {
         var container = $('#support-options-container');
         container.empty();
-
         options.forEach(function (option) {
             var button = $('<button>')
                 .addClass('support-option-btn')
@@ -165,7 +153,6 @@ var selectedSource = '';
 
             container.append(button);
         });
-
         container.show();
     }
 
@@ -272,19 +259,20 @@ var selectedSource = '';
             }
         });
     }
+
     /**
-    * Поиск решений
-    * @param {string} query Поисковый запрос
-    */
+     * Поиск решений через API (использующее curl внутри)
+     * @param {string} query Поисковый запрос
+     */
     function searchSolutions(query) {
-        var api = new mw.Api();
         var useAI = $('#support-search-use-ai').is(':checked');
         $('#support-search-results').html(
             '<div class="support-loading">' +
             '<div class="support-spinner"></div>' +
-            '<p>' + getMessage('supportsystem-search-loading', 'Searching...') + '</p>' +
+            '<p>' + getMessage('supportsystem-search-loading', 'Поиск...') + '</p>' +
             '</div>'
         );
+        var api = new mw.Api();
         api.get({
             action: 'unifiedsearch',
             query: query,
@@ -299,25 +287,21 @@ var selectedSource = '';
                 });
             }
             if (data.results && data.results.cirrus) {
-                data.results.cirrus.forEach(function (result) {
-                    results.push(result);
-                });
+                data.results.cirrus.forEach(function (result) { results.push(result); });
             }
-            results.sort(function (a, b) {
-                return b.score - a.score;
+            results.sort(function (a, b) { return b.score - a.score;
             });
-            if (useAI && data.results && data.results.ai) {
-                displayAIResult(data.results.ai, query);
-            } else if (results.length > 0) {
-                displaySearchResults(results, query);
-            } else {
+
+            if (useAI && data.results && data.results.ai) { displayAIResult(data.results.ai, query); }
+            else if (results.length > 0) { displaySearchResults(results, query); }
+            else {
                 $('#support-search-results').html(
                     '<div class="support-no-results">' +
-                    '<p>' + getMessage('supportsystem-search-noresults', 'No results found. Try changing your query.') + '</p>' +
+                    '<p>' + getMessage('supportsystem-search-noresults', 'Результатов не найдено. Попробуйте изменить запрос.') + '</p>' +
                     '</div>' +
                     (useAI ? '' : '<div class="support-try-ai">' +
                         '<button id="support-search-ai-button" class="support-button-primary">' +
-                        getMessage('supportsystem-search-try-ai', 'Try AI-powered search') + '</button>' +
+                        getMessage('supportsystem-search-try-ai', 'Попробуйте AI-поиск') + '</button>' +
                         '</div>')
                 );
                 $('#support-search-ai-button').on('click', function () {
@@ -325,14 +309,15 @@ var selectedSource = '';
                     searchSolutions(query);
                 });
             }
-        }).fail(function (error) {
+        }).fail(function () {
             $('#support-search-results').html(
                 '<div class="support-error">' +
-                '<p>' + getMessage('supportsystem-search-error', 'An error occurred during the search.') + '</p>' +
+                '<p>' + getMessage('supportsystem-search-error', 'Произошла ошибка при поиске.') + '</p>' +
                 '</div>'
             );
         });
     }
+
     /**
      * Отображение результатов AI поиска
      * @param {Object} aiResult Результат AI поиска
@@ -474,48 +459,46 @@ var selectedSource = '';
         });
     }
 
+    /**
+     * Функция загрузки списка тикетов через curl
+     * @param {number} limit Максимальное количество тикетов
+     * @param {number} offset Смещение для пагинации
+     */
     function loadTickets(limit = 25, offset = 0) {
-        var api = new mw.Api();
         $('#support-tickets-list').html(
             '<div class="support-loading">' +
             '<div class="support-spinner"></div>' +
-            '<p>' + (mw.msg('supportsystem-sd-loading') || 'Loading tickets...') + '</p>' +
+            '<p>' + (mw.msg('supportsystem-sd-loading') || 'Загрузка тикетов...') + '</p>' +
             '</div>'
         );
-        console.log('Загрузка тикетов (limit: ' + limit + ', offset: ' + offset + ')');
+        var api = new mw.Api();
         api.get({
             action: 'supportticket',
             operation: 'list',
             limit: limit,
             offset: offset
         }).done(function (data) {
-            console.log('Ответ API на загрузку тикетов:', data);
-
             if (data.tickets && data.tickets.length > 0) {
                 displayTickets(data.tickets);
             } else {
                 $('#support-tickets-list').html(
                     '<div class="support-empty-list">' +
-                    '<p>' + (mw.msg('supportsystem-sd-empty') || 'You don\'t have any tickets yet') + '</p>' +
+                    '<p>' + (mw.msg('supportsystem-sd-empty') || 'У вас нет тикетов') + '</p>' +
                     '</div>'
                 );
             }
-        }).fail(function (xhr, status, error) {
-            console.error('Ошибка загрузки тикетов:', {
-                status: status,
-                error: error,
-                response: xhr.responseText || 'Нет текста ответа'
-            });
+        }).fail(function () {
             $('#support-tickets-list').html(
                 '<div class="support-error">' +
-                '<p>' + (mw.msg('supportsystem-sd-error') || 'Error loading tickets') + '</p>' +
+                '<p>' + (mw.msg('supportsystem-sd-error') || 'Ошибка загрузки тикетов') + '</p>' +
                 '</div>'
             );
         });
     }
+
     /**
-     * Отображение списка заявок
-     * @param {Array} tickets Список заявок
+     * Функция отображения списка тикетов
+     * @param {Array} tickets Список тикетов
      */
     function displayTickets(tickets) {
         var listHtml = '';
@@ -523,22 +506,27 @@ var selectedSource = '';
             return new Date(b.created_on) - new Date(a.created_on);
         });
         tickets.forEach(function (ticket) {
-            var statusName = ((ticket.status || {}).name || 'New');
-            var statusClass = 'support-status-' + statusName.toLowerCase().replace(' ', '-');
-            var priorityName = ((ticket.priority || {}).name || 'Normal');
-            var priorityClass = 'support-priority-' + priorityName.toLowerCase().replace(' ', '-');
+            var statusName = ((ticket.status || {}).name || 'Новый');
+            var statusClass = 'support-status-' + statusName.toLowerCase().replace(/\s+/g, '-');
+            var priorityMapping = {
+                1: { class: 'support-priority-red', name: 'Критический' },
+                2: { class: 'support-priority-orange', name: 'Высокий' },
+                6: { class: 'support-priority-normal', name: 'Нормальный' },
+                3: { class: 'support-priority-green', name: 'Низкий' }
+            };
+
+            var priority = priorityMapping[6];
+            if (ticket.priority && ticket.priority.id) {
+                priority = priorityMapping[ticket.priority.id] || priority;
+            }
             listHtml +=
                 '<div class="support-ticket-item" data-ticket-id="' + ticket.id + '">' +
                 '<div class="support-ticket-header">' +
                 '<h4>#' + ticket.id + ': ' + ticket.subject + '</h4>' +
-                '<div class="support-ticket-meta">' +
-                '<span class="support-status-badge ' + statusClass + '">' +
-                statusName + '</span>' +
-                '</div>' +
                 '</div>' +
                 '<div class="support-ticket-info">' +
-                '<span class="support-priority-badge ' + priorityClass + '">' +
-                priorityName + '</span>' +
+                '<span class="' + statusClass + '">' + statusName + '</span> ' +
+                '<span class="' + priority.class + '">' + priority.name + '</span>' +
                 '<span class="support-ticket-date">' + formatDate(ticket.created_on) + '</span>' +
                 '</div>' +
                 '</div>';
@@ -551,34 +539,32 @@ var selectedSource = '';
     }
 
     /**
-     * Просмотр заявки
-     * @param {number} ticketId ID заявки
+     * Функция просмотра тикета по ID, переписанная под curl
+     * @param {number} ticketId ID тикета
      */
     function viewTicket(ticketId) {
-        var api = new mw.Api();
         $('#support-tickets-list').hide();
         $('#support-ticket-details').show().data('ticket-id', ticketId);
         $('#support-ticket-details').html(
             '<div class="support-loading">' +
             '<div class="support-spinner"></div>' +
-            '<p>' + (mw.msg('supportsystem-sd-loading') || 'Loading ticket...') + '</p>' +
+            '<p>' + (mw.msg('supportsystem-sd-loading') || 'Загрузка тикета...') + '</p>' +
             '</div>'
         );
-        console.log('Загрузка тикета #' + ticketId);
+        var api = new mw.Api();
         api.get({
             action: 'supportticket',
             operation: 'get',
             ticket_id: ticketId
         }).done(function (data) {
-            console.log('Ответ API на загрузку тикета:', data);
             if (data.ticket) {
                 displayTicketDetails(data.ticket);
             } else {
                 $('#support-ticket-details').html(
                     '<div class="support-error">' +
-                    '<p>' + (mw.msg('supportsystem-error-ticket-not-found') || 'Ticket not found') + '</p>' +
+                    '<p>' + (mw.msg('supportsystem-error-ticket-not-found') || 'Тикет не найден') + '</p>' +
                     '<button id="support-ticket-details-back" class="support-button-secondary">' +
-                    (mw.msg('supportsystem-sd-ticket-back') || 'Back to List') + '</button>' +
+                    (mw.msg('supportsystem-sd-ticket-back') || 'Назад к списку') + '</button>' +
                     '</div>'
                 );
                 $('#support-ticket-details-back').on('click', function () {
@@ -586,17 +572,12 @@ var selectedSource = '';
                     $('#support-tickets-list').show();
                 });
             }
-        }).fail(function (xhr, status, error) {
-            console.error('Ошибка загрузки тикета #' + ticketId + ':', {
-                status: status,
-                error: error,
-                response: xhr.responseText || 'Нет текста ответа'
-            });
+        }).fail(function () {
             $('#support-ticket-details').html(
                 '<div class="support-error">' +
-                '<p>' + (mw.msg('supportsystem-sd-ticket-error') || 'Error loading ticket') + '</p>' +
+                '<p>' + (mw.msg('supportsystem-sd-ticket-error') || 'Ошибка загрузки тикета') + '</p>' +
                 '<button id="support-ticket-details-back" class="support-button-secondary">' +
-                (mw.msg('supportsystem-sd-ticket-back') || 'Back to List') + '</button>' +
+                (mw.msg('supportsystem-sd-ticket-back') || 'Назад к списку') + '</button>' +
                 '</div>'
             );
             $('#support-ticket-details-back').on('click', function () {
@@ -605,55 +586,60 @@ var selectedSource = '';
             });
         });
     }
+
     /**
- * Отображение деталей заявки
- * @param {Object} ticket Данные заявки
- */
+     * Отображение деталей тикета с упрощенным интерфейсом для конструкторского бюро
+     * @param {Object} ticket Данные тикета
+     */
     function displayTicketDetails(ticket) {
-        console.log('Отображение деталей тикета:', ticket);
         if ($('#support-ticket-details-title').length === 0) {
             $('#support-ticket-details').html(`
-                <div class="support-ticket-details-header">
-                    <h3 id="support-ticket-details-title"></h3>
-                    <button id="support-ticket-details-back" class="support-button-secondary">
-                        ${mw.msg('supportsystem-sd-ticket-back') || 'Back to List'}
+            <div class="support-ticket-details-header">
+                <h3 id="support-ticket-details-title"></h3>
+                <button id="support-ticket-details-back" class="support-button-secondary">
+                    ${mw.msg('supportsystem-sd-ticket-back') || 'Назад к списку'}
+                </button>
+            </div>
+            
+            <div class="support-ticket-details-info">
+                <div class="support-ticket-status">
+                    <span class="support-label">${mw.msg('supportsystem-sd-ticket-status') || 'Статус'}:</span>
+                    <span id="support-ticket-status"></span>
+                </div>
+                <div class="support-ticket-priority">
+                    <span class="support-label">${mw.msg('supportsystem-sd-ticket-priority') || 'Приоритет'}:</span>
+                    <span id="support-ticket-priority-value"></span>
+                </div>
+            </div>
+            
+            <div class="support-ticket-description-section">
+                <h4>${mw.msg('supportsystem-sd-ticket-description') || 'Описание'}</h4>
+                <div id="support-ticket-description-text" class="support-ticket-description-content"></div>
+            </div>
+            
+            <!-- Область для кастомных полей -->
+            <div id="support-ticket-custom-fields"></div>
+            
+            <!-- Область для вложений -->
+            <div id="support-ticket-attachments" class="support-ticket-attachments-section">
+                <h4>${mw.msg('supportsystem-attachment-list') || 'Вложения'}</h4>
+                <div class="support-attachments-list"></div>
+            </div>
+            
+            <!-- Область для комментариев -->
+            <div class="support-ticket-comments-section">
+                <h4>${mw.msg('supportsystem-sd-ticket-comments') || 'Комментарии'}</h4>
+                <div id="support-ticket-comments" class="support-ticket-comments-list"></div>
+                
+                <div class="support-comment-form">
+                    <textarea id="support-comment-text" class="support-textarea" 
+                        placeholder="${mw.msg('supportsystem-sd-ticket-comment-placeholder') || 'Введите ваш комментарий...'}"></textarea>
+                    <button id="support-comment-submit" class="support-button-primary">
+                        ${mw.msg('supportsystem-sd-ticket-comment-submit') || 'Отправить'}
                     </button>
                 </div>
-                
-                <div class="support-ticket-details-info">
-                    <div class="support-ticket-status">
-                        <span class="support-label">${mw.msg('supportsystem-sd-ticket-status') || 'Status'}:</span>
-                        <span id="support-ticket-status"></span>
-                    </div>
-                    <div class="support-ticket-priority">
-                        <span class="support-label">${mw.msg('supportsystem-sd-ticket-priority') || 'Priority'}:</span>
-                        <span id="support-ticket-priority-value"></span>
-                    </div>
-                    <div class="support-ticket-created">
-                        <span class="support-label">${mw.msg('supportsystem-sd-ticket-created') || 'Created On'}:</span>
-                        <span id="support-ticket-created-date"></span>
-                    </div>
-                </div>
-                
-                <div class="support-ticket-description-section">
-                    <h4>${mw.msg('supportsystem-sd-ticket-description') || 'Description'}</h4>
-                    <div id="support-ticket-description-text" class="support-ticket-description-content"></div>
-                </div>
-                
-                <div class="support-ticket-comments-section">
-                    <h4>${mw.msg('supportsystem-sd-ticket-comments') || 'Comments'}</h4>
-                    <div id="support-ticket-comments" class="support-ticket-comments-list"></div>
-                    
-                    <div class="support-comment-form">
-                        <h5>${mw.msg('supportsystem-sd-ticket-add-comment') || 'Add Comment'}</h5>
-                        <textarea id="support-comment-text" class="support-textarea" 
-                            placeholder="${mw.msg('supportsystem-sd-ticket-comment-placeholder') || 'Enter your comment...'}"></textarea>
-                        <button id="support-comment-submit" class="support-button-primary">
-                            ${mw.msg('supportsystem-sd-ticket-comment-submit') || 'Submit'}
-                        </button>
-                    </div>
-                </div>
-            `);
+            </div>
+        `);
             $('#support-ticket-details-back').on('click', function () {
                 $('#support-ticket-details').hide();
                 $('#support-tickets-list').show();
@@ -664,55 +650,69 @@ var selectedSource = '';
                 if (comment) {
                     addComment(ticketId, comment);
                 } else {
-                    mw.notify(mw.msg('supportsystem-sd-ticket-comment-required') || 'Please enter a comment', { type: 'error' });
+                    mw.notify(mw.msg('supportsystem-sd-ticket-comment-required') || 'Пожалуйста, введите комментарий', { type: 'error' });
                 }
             });
         }
         $('#support-ticket-details-title').text('#' + ticket.id + ': ' + ticket.subject);
-        var statusName = ((ticket.status || {}).name || 'New');
-        var statusClass = 'support-status-' + statusName.toLowerCase().replace(' ', '-');
+        var statusName = ((ticket.status || {}).name || 'Новый');
+        var statusClass = 'support-status-' + statusName.toLowerCase().replace(/\s+/g, '-');
         $('#support-ticket-status').text(statusName)
             .removeClass()
             .addClass(statusClass);
-        var priorityName = ((ticket.priority || {}).name || 'Yellow');
-        var displayPriorityName = '';
-        var priorityClass = 'support-priority-normal';
-        
+        var priorityMapping = {
+            1: { class: 'support-priority-red', name: 'Критический' },
+            2: { class: 'support-priority-orange', name: 'Высокий' },
+            6: { class: 'support-priority-normal', name: 'Нормальный' },
+            3: { class: 'support-priority-green', name: 'Низкий' }
+        };
+        var priority = priorityMapping[6];
         if (ticket.priority && ticket.priority.id) {
-            switch (ticket.priority.id) {
-                case 1: // Red
-                    priorityClass = 'support-priority-red';
-                    displayPriorityName = 'Красный (критический)';
-                    break;
-                case 2: // Orange
-                    priorityClass = 'support-priority-orange';
-                    displayPriorityName = 'Оранжевый (высокий)';
-                    break;
-                case 3: // Yellow
-                    priorityClass = 'support-priority-normal';
-                    displayPriorityName = 'Желтый (нормальный)';
-                    break;
-                case 4: // Green
-                    priorityClass = 'support-priority-green';
-                    displayPriorityName = 'Зеленый (низкий)';
-                    break;
-                default:
-                    priorityClass = 'support-priority-normal';
-                    displayPriorityName = 'Нормальный';
+            priority = priorityMapping[ticket.priority.id] || priority;
+        }
+        $('#support-ticket-priority-value').text(priority.name)
+            .removeClass()
+            .addClass(priority.class);
+        $('#support-ticket-description-text').text(ticket.description || '');
+        var customFieldsHtml = '';
+        if (ticket.custom_fields && ticket.custom_fields.length > 0) {
+            var hasVisibleFields = false;
+            customFieldsHtml = '<div class="support-custom-fields-section"><h4>Дополнительная информация</h4><dl>';
+            ticket.custom_fields.forEach(function (field) {
+                if (field.value &&
+                    (Array.isArray(field.value) ? field.value.length > 0 : field.value.toString().trim() !== '')) {
+                    hasVisibleFields = true;
+                    var value = Array.isArray(field.value) ? field.value.join(', ') : field.value;
+                    customFieldsHtml += '<dt>' + field.name + ':</dt><dd>' + value + '</dd>';
+                }
+            });
+            customFieldsHtml += '</dl></div>';
+            if (hasVisibleFields) {
+                $('#support-ticket-custom-fields').html(customFieldsHtml);
+            } else {
+                $('#support-ticket-custom-fields').empty();
             }
         } else {
-            displayPriorityName = 'Нормальный';
+            $('#support-ticket-custom-fields').empty();
         }
-        
-        $('#support-ticket-priority-value').text(displayPriorityName || priorityName)
-            .removeClass()
-            .addClass(priorityClass);
-        
-        $('#support-ticket-created-date').text(formatDate(ticket.created_on));
-        $('#support-ticket-description-text').text(ticket.description || '');
+        var attachmentsHtml = '';
+        if (ticket.attachments && ticket.attachments.length > 0) {
+            ticket.attachments.forEach(function (attachment) {
+                attachmentsHtml += '<div class="support-attachment-item">' +
+                    '<a href="' + attachment.content_url + '" target="_blank" class="support-attachment-link">' +
+                    '<span class="support-attachment-icon">📎</span> ' +
+                    attachment.filename + ' (' + formatFileSize(attachment.filesize) + ')' +
+                    '</a>' +
+                    '</div>';
+            });
+            $('.support-attachments-list').html(attachmentsHtml);
+            $('#support-ticket-attachments').show();
+        } else {
+            $('.support-attachments-list').html('<p>Нет прикрепленных файлов</p>');
+            $('#support-ticket-attachments').show();
+        }
         var commentsHtml = '';
         var hasComments = false;
-
         if (ticket.journals && ticket.journals.length > 0) {
             ticket.journals.forEach(function (journal) {
                 if (journal.notes && journal.notes.trim()) {
@@ -721,7 +721,7 @@ var selectedSource = '';
                         '<div class="support-comment-content">' + journal.notes + '</div>' +
                         '<div class="support-comment-meta">' +
                         '<span class="support-comment-author">' +
-                        (journal.user && journal.user.name ? journal.user.name : 'Unknown') + '</span> ' +
+                        (journal.user && journal.user.name ? journal.user.name : 'Неизвестный') + '</span> ' +
                         '<span class="support-comment-date">' + formatDate(journal.created_on) + '</span>' +
                         '</div>' +
                         '</div>';
@@ -730,34 +730,10 @@ var selectedSource = '';
         }
         if (!hasComments) {
             commentsHtml = '<p class="support-no-comments">' +
-                (mw.msg('supportsystem-sd-ticket-no-comments') || 'No comments yet') + '</p>';
+                (mw.msg('supportsystem-sd-ticket-no-comments') || 'Комментариев пока нет') + '</p>';
         }
         $('#support-ticket-comments').html(commentsHtml);
         $('#support-comment-text').val('');
-        if (ticket.attachments && ticket.attachments.length > 0) {
-            var attachmentsHtml = '<div class="support-ticket-attachments-section">' +
-                '<h4>' + (mw.msg('supportsystem-attachment-list') || 'Attachments') + '</h4>' +
-                '<div class="support-attachments-list">';
-            
-            ticket.attachments.forEach(function(attachment) {
-                attachmentsHtml += '<div class="support-attachment-item">' +
-                    '<a href="' + attachment.content_url + '" target="_blank" class="support-attachment-link">' +
-                    '<span class="support-attachment-icon">📎</span> ' +
-                    attachment.filename + ' (' + formatFileSize(attachment.filesize) + ')' +
-                    '</a>' +
-                    '</div>';
-            });
-            
-            attachmentsHtml += '</div></div>';
-            
-            // Удаляем предыдущую секцию вложений, если она есть
-            $('.support-ticket-attachments-section').remove();
-            
-            // Вставляем список вложений перед секцией комментариев
-            $('.support-ticket-comments-section').before(attachmentsHtml);
-        }
-        
-        // Инициализируем форму загрузки файлов
         initFileUpload();
     }
     /**
@@ -797,83 +773,87 @@ var selectedSource = '';
         $('#support-ticket-form').show();
     }
 
-    /**
-     * Отправка формы заявки
-     */
     function submitTicket() {
-        var api = new mw.Api();
         var subject = $('#support-ticket-subject').val();
         var description = $('#support-ticket-description').val();
         var priority = $('#support-ticket-priority').val();
-
         if (!subject) {
-            mw.notify(getMessage('supportsystem-sd-ticket-subject-required', 'Ticket subject is required'), { type: 'error' });
+            mw.notify(getMessage('supportsystem-sd-ticket-subject-required', 'Требуется указать тему тикета'), { type: 'error' });
             $('#support-ticket-subject').focus();
             return;
         }
-
         if (!description) {
-            mw.notify(getMessage('supportsystem-sd-ticket-description-required', 'Problem description is required'), { type: 'error' });
+            mw.notify(getMessage('supportsystem-sd-ticket-description-required', 'Требуется указать описание проблемы'), { type: 'error' });
             $('#support-ticket-description').focus();
             return;
         }
-
         $('#support-ticket-submit').prop('disabled', true);
-        $('#support-ticket-submit').text(getMessage('supportsystem-dt-submitting', 'Submitting...'));
-
-        console.log('Отправка запроса на создание тикета:', {
-            subject: subject,
-            priority: priority,
-            description_length: description.length
-        });
-
-        api.post({
-            action: 'supportticket',
-            operation: 'create',
-            subject: subject,
-            description: description,
-            priority: priority
-        }).done(function (data) {
-            console.log('Ответ API на создание тикета:', data);
-
-            if (data.ticket) {
-                if (selectedSolution) {
-                    attachSolution(data.ticket.id);
-                } else {
-                    showTicketSuccess(data.ticket.id);
-                }
-            } else {
-                console.error('Ошибка создания тикета:', data);
-                mw.notify(getMessage('supportsystem-search-ticket-error', 'Error creating ticket'),
-                    { type: 'error' });
-                $('#support-ticket-submit').prop('disabled', false);
-                $('#support-ticket-submit').text(getMessage('supportsystem-dt-submit', 'Submit'));
-            }
-        }).fail(function (xhr, status, error) {
-            console.error('Сбой запроса создания тикета:', {
-                status: status,
-                error: error,
-                response: xhr.responseText || 'Нет текста ответа'
-            });
-
-            var errorMsg = '';
+        $('#support-ticket-submit').text(getMessage('supportsystem-dt-submitting', 'Отправка...'));
+        var api = new mw.Api();
+        var url = mw.util.wikiScript('api');
+        var formData = new FormData();
+        formData.append('action', 'supportticket');
+        formData.append('operation', 'create');
+        formData.append('subject', subject);
+        formData.append('description', description);
+        formData.append('priority', priority);
+        formData.append('format', 'json');
+        formData.append('token', mw.user.tokens.get('csrfToken'));
+        var form = document.createElement('form');
+        form.method = 'POST';
+        form.action = url;
+        form.style.display = 'none';
+        document.body.appendChild(form);
+        for (var pair of formData.entries()) {
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = pair[0];
+            input.value = pair[1];
+            form.appendChild(input);
+        }
+        var iframe = document.createElement('iframe');
+        iframe.name = 'ticket_frame_' + Date.now();
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+        form.target = iframe.name;
+        iframe.onload = function () {
             try {
-                if (xhr.responseJSON && xhr.responseJSON.error) {
-                    errorMsg = xhr.responseJSON.error.info || status || 'Unknown error';
+                var iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                var response = JSON.parse(iframeDoc.body.innerText);
+                if (response && response.ticket) {
+                    if (selectedSolution) { attachSolution(response.ticket.id); }
+                    else { showTicketSuccess(response.ticket.id); }
                 } else {
-                    errorMsg = status || 'Unknown error';
+                    console.error('Ошибка создания тикета:', response);
+                    mw.notify(getMessage('supportsystem-search-ticket-error', 'Ошибка создания тикета'),
+                        { type: 'error' });
+                    $('#support-ticket-submit').prop('disabled', false);
+                    $('#support-ticket-submit').text(getMessage('supportsystem-dt-submit', 'Отправить'));
                 }
             } catch (e) {
-                errorMsg = 'Error parsing response';
+                console.error('Ошибка обработки ответа:', e);
+                mw.notify(getMessage('supportsystem-search-ticket-error', 'Ошибка создания тикета'),
+                    { type: 'error' });
+                $('#support-ticket-submit').prop('disabled', false);
+                $('#support-ticket-submit').text(getMessage('supportsystem-dt-submit', 'Отправить'));
             }
-
-            mw.notify(getMessage('supportsystem-search-ticket-error', 'Error creating ticket') +
-                ': ' + errorMsg, { type: 'error' });
+            setTimeout(function () {
+                document.body.removeChild(form);
+                document.body.removeChild(iframe);
+            }, 100);
+        };
+        iframe.onerror = function () {
+            mw.notify(getMessage('supportsystem-search-ticket-error', 'Ошибка создания тикета'),
+                { type: 'error' });
             $('#support-ticket-submit').prop('disabled', false);
-            $('#support-ticket-submit').text(getMessage('supportsystem-dt-submit', 'Submit'));
-        });
+            $('#support-ticket-submit').text(getMessage('supportsystem-dt-submit', 'Отправить'));
+            setTimeout(function () {
+                document.body.removeChild(form);
+                document.body.removeChild(iframe);
+            }, 100);
+        };
+        form.submit();
     }
-
     /**
      * Прикрепление решения к заявке
      * @param {number} ticketId ID заявки
@@ -903,37 +883,30 @@ var selectedSource = '';
         });
     }
     /**
-     * Добавление комментария к заявке
-     * @param {number} ticketId ID заявки
+     * Функция добавления комментария к тикету через curl
+     * @param {number} ticketId ID тикета
      * @param {string} comment Текст комментария
      */
     function addComment(ticketId, comment) {
-        var api = new mw.Api();
         $('#support-comment-submit').prop('disabled', true);
-        console.log('Добавление комментария к тикету #' + ticketId);
+        var api = new mw.Api();
         api.post({
             action: 'supportticket',
             operation: 'comment',
             ticket_id: ticketId,
             comment: comment
         }).done(function (data) {
-            console.log('Ответ API на добавление комментария:', data);
             if (data.result === 'success') {
-                mw.notify(getMessage('supportsystem-sd-ticket-comment-success', 'Comment added successfully'),
+                mw.notify(mw.msg('supportsystem-sd-ticket-comment-success') || 'Комментарий успешно добавлен',
                     { type: 'success' });
                 $('#support-comment-text').val('');
                 viewTicket(ticketId);
             } else {
-                mw.notify(getMessage('supportsystem-sd-ticket-comment-error', 'Error adding comment'),
+                mw.notify(mw.msg('supportsystem-sd-ticket-comment-error') || 'Ошибка добавления комментария',
                     { type: 'error' });
             }
-        }).fail(function (xhr, status, error) {
-            console.error('Ошибка добавления комментария:', {
-                status: status,
-                error: error,
-                response: xhr.responseText || 'Нет текста ответа'
-            });
-            mw.notify(getMessage('supportsystem-sd-ticket-comment-error', 'Error adding comment'),
+        }).fail(function () {
+            mw.notify(mw.msg('supportsystem-sd-ticket-comment-error') || 'Ошибка добавления комментария',
                 { type: 'error' });
         }).always(function () {
             $('#support-comment-submit').prop('disabled', false);
@@ -946,96 +919,108 @@ var selectedSource = '';
         if ($('#support-ticket-details').length && !$('#support-file-upload-form').length) {
             var uploadFormHtml = `
             <div class="support-file-upload-section">
-                <h4>${mw.msg('supportsystem-attachment-upload') || 'Upload File'}</h4>
+                <h4>${mw.msg('supportsystem-attachment-upload') || 'Загрузить файл'}</h4>
                 <form id="support-file-upload-form" enctype="multipart/form-data">
                     <div class="support-form-group">
-                        <label for="support-file-input">${mw.msg('supportsystem-attachment-add') || 'Add File'}</label>
                         <input type="file" id="support-file-input" class="support-file-input" name="file">
                     </div>
                     <div class="support-form-group">
-                        <label for="support-file-comment">${mw.msg('supportsystem-sd-ticket-comment-placeholder') || 'Comment'}</label>
-                        <textarea id="support-file-comment" class="support-textarea" rows="2"></textarea>
+                        <textarea id="support-file-comment" class="support-textarea" rows="2"
+                            placeholder="${mw.msg('supportsystem-sd-ticket-comment-placeholder') || 'Комментарий к файлу...'}"></textarea>
                     </div>
                     <button type="submit" id="support-file-upload-button" class="support-button-primary">
-                        ${mw.msg('supportsystem-attachment-upload') || 'Upload'}
+                        ${mw.msg('supportsystem-attachment-upload') || 'Загрузить'}
                     </button>
                 </form>
                 <div id="support-file-upload-progress" class="support-upload-progress" style="display: none;">
                     <div class="support-spinner"></div>
-                    <p>${mw.msg('supportsystem-dt-submitting') || 'Uploading...'}</p>
+                    <p>${mw.msg('supportsystem-dt-submitting') || 'Загрузка...'}</p>
                 </div>
             </div>
         `;
             $('.support-ticket-comments-section').before(uploadFormHtml);
+
             $('#support-file-upload-form').on('submit', function (e) {
                 e.preventDefault();
                 uploadFileToTicket();
             });
         }
     }
-    /**
- * Function for uploading a file to the ticket
- */
+
     function uploadFileToTicket() {
         var ticketId = $('#support-ticket-details').data('ticket-id');
         var fileInput = $('#support-file-input')[0];
-        var comment = $('#support-file-comment').val();
-
+        var comment = $('#support-file-comment').val() || 'Файл прикреплен';
         if (!fileInput.files || fileInput.files.length === 0) {
             mw.notify('Пожалуйста, выберите файл для загрузки', { type: 'error' });
             return;
         }
-
-        var file = fileInput.files[0];
         $('#support-file-upload-form').hide();
         $('#support-file-upload-progress').show();
-
-        // Step 1: Upload the file to Redmine and get a token
-        var formData = new FormData();
-        formData.append('filename', file.name);
-        var uploadCommand = "curl -s -X POST " +
-            "-H 'Content-Type: application/octet-stream' " +
-            "-H 'X-Redmine-API-Key: e0d62b7b9695048dd4a4d44bbc9f074c865fcf2f' " +
-            "--data-binary @" + file.name + " " +
-            "'" + mw.config.get('wgSupportSystemRedmineURL') + "/uploads.json?filename=" + encodeURIComponent(file.name) + "'";
-        $.ajax({
-            url: mw.util.wikiScript('api'),
-            type: 'POST',
-            data: {
-                action: 'supportattachment',
-                operation: 'upload',
-                ticket_id: ticketId,
-                comment: comment || 'Файл прикреплен',
-                filename: file.name,
-                format: 'json',
-                token: mw.user.tokens.get('csrfToken')
-            },
-            dataType: 'json',
-            success: function (data) {
-                if (data && data.result === 'success') {
-                    mw.notify('Файл успешно загружен', { type: 'success' });
+        var form = document.createElement('form');
+        form.method = 'POST';
+        form.action = mw.util.wikiScript('api');
+        form.enctype = 'multipart/form-data';
+        form.style.display = 'none';
+        var params = {
+            'action': 'supportattachment',
+            'operation': 'upload',
+            'ticket_id': ticketId,
+            'comment': comment,
+            'format': 'json',
+            'token': mw.user.tokens.get('csrfToken')
+        };
+        for (var key in params) {
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = key;
+            input.value = params[key];
+            form.appendChild(input);
+        }
+        var fileInputClone = fileInput.cloneNode(true);
+        fileInputClone.name = 'file';
+        form.appendChild(fileInputClone);
+        document.body.appendChild(form);
+        var iframe = document.createElement('iframe');
+        iframe.name = 'upload_frame_' + Date.now();
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+        form.target = iframe.name;
+        iframe.onload = function () {
+            try {
+                var iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                var response = JSON.parse(iframeDoc.body.innerText);
+                if (response && response.result === 'success') {
+                    mw.notify(mw.msg('supportsystem-attachment-success') || 'Файл успешно загружен', { type: 'success' });
                     viewTicket(ticketId);
                 } else {
-                    var errorMsg = data.error ? data.error.info : 'Неизвестная ошибка';
-                    mw.notify('Ошибка загрузки файла: ' + errorMsg, { type: 'error' });
+                    var errorMsg = response.error ? response.error.info : 'Неизвестная ошибка';
+                    mw.notify(mw.msg('supportsystem-attachment-error') || 'Ошибка загрузки файла: ' + errorMsg, { type: 'error' });
                     $('#support-file-upload-progress').hide();
                     $('#support-file-upload-form').show();
                 }
-            },
-            error: function (xhr, status, error) {
-                var errorMsg = '';
-                try {
-                    var response = JSON.parse(xhr.responseText);
-                    errorMsg = response.error ? response.error.info : error;
-                } catch (e) {
-                    errorMsg = error || 'Неизвестная ошибка';
-                }
-                mw.notify('Ошибка загрузки файла: ' + errorMsg, { type: 'error' });
+            } catch (e) {
+                mw.notify(mw.msg('supportsystem-attachment-error') || 'Ошибка обработки ответа сервера', { type: 'error' });
                 $('#support-file-upload-progress').hide();
                 $('#support-file-upload-form').show();
             }
-        });
+            setTimeout(function () {
+                document.body.removeChild(form);
+                document.body.removeChild(iframe);
+            }, 100);
+        };
+        iframe.onerror = function () {
+            mw.notify(mw.msg('supportsystem-attachment-error') || 'Ошибка при загрузке файла', { type: 'error' });
+            $('#support-file-upload-progress').hide();
+            $('#support-file-upload-form').show();
+            setTimeout(function () {
+                document.body.removeChild(form);
+                document.body.removeChild(iframe);
+            }, 100);
+        };
+        form.submit();
     }
+
     /**
      * Форматирование размера файла
      * @param {number} bytes Размер в байтах
@@ -1052,6 +1037,7 @@ var selectedSource = '';
             return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
         }
     }
+
     /**
      * Показать сообщение об успешном создании заявки
      * @param {number} ticketId ID заявки
@@ -1068,22 +1054,17 @@ var selectedSource = '';
         showPanel('tickets');
     }
 
-
     /**
      * Форматирование даты
      * @param {string} dateStr Строка с датой
      * @return {string} Отформатированная дата
      */
     function formatDate(dateStr) {
-        if (!dateStr) {
-            return '';
-        }
+        if (!dateStr) { return ''; }
         try {
             var date = new Date(dateStr);
             return date.toLocaleString();
-        } catch (e) {
-            return dateStr;
-        }
+        } catch (e) { return dateStr; }
     }
 
     /**

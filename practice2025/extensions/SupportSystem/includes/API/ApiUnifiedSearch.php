@@ -3,52 +3,42 @@
 namespace MediaWiki\Extension\SupportSystem\API;
 
 use ApiBase;
-use CirrusSearch\CirrusSearch;
 use MediaWiki\MediaWikiServices;
-use Http;
-use Exception;
+use MWException;
 
 /**
  * Единый API-модуль для всех типов поиска (OpenSearch, CirrusSearch, AI Search)
  */
 class ApiUnifiedSearch extends ApiBase
 {
-    /**
-     * Выполнение API-запроса
-     */
     public function execute()
     {
         try {
-            // Получение параметров
             $params = $this->extractRequestParams();
             $query = $params['query'];
             $useAI = $params['use_ai'];
             $context = $params['context'] ? json_decode($params['context'], true) : [];
             $limit = $params['limit'];
             $sources = $params['sources'];
-
-            // Подготовка результатов
             $results = [
                 'cirrus' => [],
                 'opensearch' => [],
                 'ai' => null
             ];
-
-            // Выполнение поиска в CirrusSearch
             if (in_array('mediawiki', $sources)) {
                 try {
                     $searchEngineFactory = MediaWikiServices::getInstance()->getSearchEngineFactory();
                     $searchEngine = $searchEngineFactory->create();
-
-                    // Проверка, что используется CirrusSearch
-                    if ($searchEngine instanceof CirrusSearch) {
+                    if (
+                        class_exists('CirrusSearch\CirrusSearch') &&
+                        ($searchEngine instanceof \CirrusSearch\CirrusSearch ||
+                            is_subclass_of($searchEngine, 'CirrusSearch\CirrusSearch'))
+                    ) {
                         $matches = $searchEngine->searchText($query, ['limit' => $limit]);
-
                         if ($matches) {
                             foreach ($matches as $match) {
                                 $title = $match->getTitle();
                                 $snippet = $match->getTextSnippet();
-
                                 $results['cirrus'][] = [
                                     'id' => $title->getArticleID(),
                                     'title' => $title->getText(),
@@ -60,21 +50,16 @@ class ApiUnifiedSearch extends ApiBase
                             }
                         }
                     }
-                } catch (Exception $e) {
+                } catch (\Exception $e) {
                     $this->addWarning('cirrus_search_error', $e->getMessage());
                 }
             }
-
-            // Выполнение поиска в OpenSearch
             if (in_array('opensearch', $sources)) {
                 try {
                     $config = MediaWikiServices::getInstance()->getMainConfig();
                     $host = $config->get('SupportSystemOpenSearchHost');
                     $port = $config->get('SupportSystemOpenSearchPort');
                     $indexName = $config->get('SupportSystemOpenSearchIndex');
-
-                    $url = "http://{$host}:{$port}/{$indexName}/_search";
-
                     $requestData = [
                         'query' => [
                             'multi_match' => [
@@ -90,18 +75,11 @@ class ApiUnifiedSearch extends ApiBase
                         ],
                         'size' => $limit
                     ];
-
-                    $options = [
-                        'method' => 'POST',
-                        'timeout' => 10,
-                        'postData' => json_encode($requestData),
-                        'headers' => [
-                            'Content-Type' => 'application/json'
-                        ]
-                    ];
-
-                    $response = Http::request($url, $options);
-
+                    $jsonData = json_encode($requestData);
+                    $url = "http://{$host}:{$port}/{$indexName}/_search";
+                    $command = "curl -s -X POST -H \"Content-Type: application/json\" " .
+                        "-d " . escapeshellarg($jsonData) . " \"$url\"";
+                    $response = shell_exec($command);
                     if ($response !== false) {
                         $data = json_decode($response, true);
 
@@ -129,52 +107,36 @@ class ApiUnifiedSearch extends ApiBase
                             }
                         }
                     }
-                } catch (Exception $e) {
+                } catch (\Exception $e) {
                     $this->addWarning('opensearch_error', $e->getMessage());
                 }
             }
-
-            // Выполнение AI-поиска
             if ($useAI) {
                 try {
                     $config = MediaWikiServices::getInstance()->getMainConfig();
                     $aiServiceUrl = $config->get('SupportSystemAIServiceURL');
-
-                    // Получаем ID пользователя
                     $userId = null;
                     $user = $this->getUser();
                     if ($user && !$user->isAnon()) {
                         $userId = 'user_' . $user->getId();
                     } else {
-                        // Для анонимных пользователей, используем ID сессии
                         $session = $this->getRequest()->getSession();
                         if ($session) {
                             $userId = 'anon_' . $session->getId();
                         }
                     }
-
                     $requestData = [
                         'query' => $query,
                         'context' => $context
                     ];
-
                     if ($userId) {
                         $requestData['user_id'] = $userId;
                     }
-
+                    $jsonData = json_encode($requestData);
                     $url = rtrim($aiServiceUrl, '/') . "/api/search_ai";
-
-                    $options = [
-                        'method' => 'POST',
-                        'timeout' => 30,
-                        'postData' => json_encode($requestData),
-                        'headers' => [
-                            'Content-Type' => 'application/json'
-                        ]
-                    ];
-
-                    $response = Http::request($url, $options);
-
+                    $command = "curl -s -X POST -H \"Content-Type: application/json\" " .
+                        "-d " . escapeshellarg($jsonData) . " \"$url\"";
+                    $response = shell_exec($command);
                     if ($response !== false) {
                         $data = json_decode($response, true);
                         $results['ai'] = [
@@ -183,7 +145,7 @@ class ApiUnifiedSearch extends ApiBase
                             'success' => $data['success'] ?? false
                         ];
                     }
-                } catch (Exception $e) {
+                } catch (\Exception $e) {
                     $this->addWarning('ai_search_error', $e->getMessage());
                     $results['ai'] = [
                         'answer' => 'Произошла ошибка при выполнении поиска',
@@ -192,18 +154,13 @@ class ApiUnifiedSearch extends ApiBase
                     ];
                 }
             }
-
-            // Возвращаем результаты
             $this->getResult()->addValue(null, 'results', $results);
 
-        } catch (Exception $e) {
-            // В случае ошибки возвращаем структурированный ответ
+        } catch (\Exception $e) {
             $this->getResult()->addValue(null, 'error', [
                 'code' => 'search_error',
                 'info' => $e->getMessage()
             ]);
-
-            // Добавляем пустые результаты для совместимости
             $this->getResult()->addValue(null, 'results', [
                 'cirrus' => [],
                 'opensearch' => [],
@@ -211,10 +168,6 @@ class ApiUnifiedSearch extends ApiBase
             ]);
         }
     }
-
-    /**
-     * Получение разрешенных параметров
-     */
     public function getAllowedParams()
     {
         return [
@@ -243,10 +196,6 @@ class ApiUnifiedSearch extends ApiBase
             ],
         ];
     }
-
-    /**
-     * Примеры для документации API
-     */
     public function getExamplesMessages()
     {
         return [

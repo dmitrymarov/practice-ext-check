@@ -7,21 +7,29 @@ use MediaWiki\Extension\SupportSystem\ServiceDesk;
 use MWException;
 use Wikimedia\ParamValidator\ParamValidator;
 
+/**
+ * API module for file attachments
+ */
 class ApiSupportAttachment extends ApiBase
 {
+    /**
+     * Execute the API module
+     */
     public function execute()
     {
         $this->requireLogin();
         $params = $this->extractRequestParams();
         $operation = $params['operation'];
+
         try {
             $serviceDesk = new ServiceDesk();
+
             switch ($operation) {
                 case 'upload':
                     $this->requirePostedParameters(['ticket_id']);
                     $request = $this->getRequest();
-                    $ticketId = $params['ticket_id'];
-                    $comment = $params['comment'];
+
+                    // Check if file exists in request
                     if (!$request->getUpload('file')) {
                         $this->dieWithError('No file uploaded', 'no_file');
                     }
@@ -38,6 +46,10 @@ class ApiSupportAttachment extends ApiBase
                     if ($fileSize <= 0) {
                         $this->dieWithError('Empty file uploaded', 'empty_file');
                     }
+
+                    $ticketId = $params['ticket_id'];
+                    $comment = $params['comment'];
+
                     try {
                         $result = $serviceDesk->attachFileToTicket(
                             $ticketId,
@@ -46,6 +58,7 @@ class ApiSupportAttachment extends ApiBase
                             $fileType,
                             $comment
                         );
+
                         if ($result) {
                             $this->getResult()->addValue(null, 'result', 'success');
                             $this->getResult()->addValue(null, 'message', 'File attached successfully');
@@ -56,6 +69,7 @@ class ApiSupportAttachment extends ApiBase
                         $this->dieWithError($e->getMessage(), 'attach_error');
                     }
                     break;
+
                 default:
                     $this->dieWithError(['apierror-invalidparameter', 'operation']);
             }
@@ -63,6 +77,11 @@ class ApiSupportAttachment extends ApiBase
             $this->dieWithError($e->getMessage(), 'api_error');
         }
     }
+
+    /**
+     * Get allowed parameters
+     * @return array
+     */
     public function getAllowedParams()
     {
         return [
@@ -81,10 +100,20 @@ class ApiSupportAttachment extends ApiBase
             ],
         ];
     }
+
+    /**
+     * Indicates this module requires write mode
+     * @return bool
+     */
     public function isWriteMode()
     {
         return true;
     }
+
+    /**
+     * Indicates whether this module requires upload
+     * @return bool
+     */
     public function mustBePosted()
     {
         return true;
