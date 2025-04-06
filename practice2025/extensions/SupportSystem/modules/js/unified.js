@@ -182,7 +182,7 @@ var selectedSource = '';
     }
 
     /**
-     * Поиск решений через API (использующее curl внутри)
+     * Поиск решений через API
      * @param {string} query Поисковый запрос
      */
     function searchSolutions(query) {
@@ -192,93 +192,125 @@ var selectedSource = '';
             '<p>' + (mw.msg('supportsystem-search-loading') || 'Поиск...') + '</p>' +
             '</div>'
         );
+        console.log('Выполняется поиск:', query);
         var api = new mw.Api();
         api.get({
             action: 'unifiedsearch',
             query: query,
-            sources: 'mediawiki',
-            context: JSON.stringify([])
+            sources: 'opensearch|mediawiki',
+            limit: 10
         }).done(function (data) {
+            console.log('Результаты поиска:', data);
             var results = [];
-            if (data.results && data.results.cirrus) {
-                data.results.cirrus.forEach(function (result) {
-                    results.push(result);
-                });
+            if (data.error) {
+                console.error('Ошибка поиска:', data.error);
+                $('#support-search-results').html(
+                    '<div class="support-error">' +
+                    '<p>' + (mw.msg('supportsystem-search-error') || 'Произошла ошибка при поиске. Пожалуйста, попробуйте позже.') + '</p>' +
+                    '</div>'
+                );
+                return;
             }
-            results.sort(function (a, b) { return b.score - a.score; });
-            if (results.length > 0) { displaySearchResults(results, query); }
-            else {
+            if (data.results) {
+                if (data.results.opensearch && Array.isArray(data.results.opensearch)) {
+                    data.results.opensearch.forEach(function (item) {
+                        if (item) results.push(item);
+                    });
+                }
+                if (data.results.mediawiki && Array.isArray(data.results.mediawiki)) {
+                    data.results.mediawiki.forEach(function (item) {
+                        if (item) results.push(item);
+                    });
+                }
+            }
+            results.sort(function (a, b) {
+                var scoreA = typeof a.score === 'number' ? a.score : 0;
+                var scoreB = typeof b.score === 'number' ? b.score : 0;
+                return scoreB - scoreA;
+            });
+
+            if (results.length > 0) {
+                displaySearchResults(results, query);
+            } else {
                 $('#support-search-results').html(
                     '<div class="support-no-results">' +
                     '<p>' + (mw.msg('supportsystem-search-noresults') || 'Результатов не найдено. Попробуйте изменить запрос.') + '</p>' +
                     '</div>'
                 );
             }
-        }).fail(function () {
+        }).fail(function (error) {
+            console.error('API error:', error);
+
             $('#support-search-results').html(
                 '<div class="support-error">' +
-                '<p>' + (mw.msg('supportsystem-search-error') || 'Произошла ошибка при поиске.') + '</p>' +
+                '<p>' + (mw.msg('supportsystem-search-error') || 'Произошла ошибка при поиске. Пожалуйста, попробуйте позже.') + '</p>' +
                 '</div>'
             );
         });
     }
 
     /**
-     * Отображение результатов обычного поиска
+     * Отображение результатов поиска
      * @param {Array} results Результаты поиска
      * @param {string} query Поисковый запрос
      */
     function displaySearchResults(results, query) {
         var resultsHtml = '';
-        resultsHtml += '<h3>' + (mw.msg('supportsystem-search-results-count', results.length) || 'Found solutions: ' + results.length) + '</h3>';
+        resultsHtml += '<h3>' + (mw.msg('supportsystem-search-results-count', results.length) || 'Найдено решений: ' + results.length) + '</h3>';
+
         results.forEach(function (result) {
+            // Безопасно получаем значения
             var source = result.source || 'unknown';
             var sourceLabel = getSourceLabel(source);
             var badgeClass = 'support-badge-' + source;
+            var resultTitle = result.title || '';
+            var resultContent = '';
 
-            var content = result.content;
+            // Обрабатываем содержимое для отображения
             if (result.highlight) {
-                content = result.highlight.replace(/\n/g, '<br>');
-            } else {
-                var maxLength = 300;
-                if (content && content.length > maxLength) {
-                    content = content.substring(0, maxLength) + '...';
+                resultContent = result.highlight;
+            } else if (result.content) {
+                resultContent = result.content;
+                if (resultContent.length > 300) {
+                    resultContent = resultContent.substring(0, 300) + '...';
                 }
             }
-            var tagsHtml = '';
-            if (result.tags && result.tags.length > 0) {
-                tagsHtml = '<div class="support-result-tags"><strong>' +
-                    (mw.msg('supportsystem-search-tags') || 'Tags') + ':</strong> ';
-                tagsHtml += result.tags.map(function (tag) {
-                    return '<span class="support-tag">' + tag + '</span>';
-                }).join(' ');
-                tagsHtml += '</div>';
+
+            // Безопасно экранируем содержимое для HTML
+            var safeTitle = $('<div>').text(resultTitle).html();
+
+            // Безопасно экранируем содержимое для атрибута data-
+            var solutionForData = '';
+            if (result.content) {
+                solutionForData = result.content.replace(/"/g, '&quot;');
+                if (solutionForData.length > 1000) {
+                    solutionForData = solutionForData.substring(0, 1000);
+                }
             }
+
+            // Форматирование результата поиска
             resultsHtml +=
                 '<div class="support-result-card">' +
                 '<div class="support-result-header">' +
-                '<h4>' + result.title + '</h4>' +
+                '<h4>' + safeTitle + '</h4>' +
                 '<div class="support-result-meta">' +
                 '<span class="support-badge ' + badgeClass + '">' + sourceLabel + '</span>' +
-                '<span class="support-score-badge">' +
-                (mw.msg('supportsystem-search-relevance', Math.round(result.score * 10) / 10) || 'Relevance: ' + (Math.round(result.score * 10) / 10)) +
-                '</span>' +
                 '</div>' +
                 '</div>' +
                 '<div class="support-result-body">' +
-                '<div class="support-result-content">' + content + '</div>' +
-                tagsHtml +
+                '<div class="support-result-content">' + resultContent + '</div>' +
                 '<div class="support-result-actions">' +
                 (result.url ? '<a href="' + result.url + '" target="_blank" class="support-source-link support-button-secondary">' +
-                    (mw.msg('supportsystem-search-source-link') || 'Go to source') + '</a>' : '') +
-                '<button class="support-create-ticket-btn support-button-primary" data-solution="' +
-                result.content.replace(/"/g, '&quot;') + '" data-source="' + source + '">' +
-                (mw.msg('supportsystem-search-create-ticket') || 'Create ticket with this solution') + '</button>' +
+                    (mw.msg('supportsystem-search-source-link') || 'Перейти к источнику') + '</a>' : '') +
+                '<button class="support-create-ticket-btn support-button-primary" data-solution="' + solutionForData + '" data-source="' + source + '">' +
+                (mw.msg('supportsystem-search-create-ticket') || 'Создать заявку с этим решением') + '</button>' +
                 '</div>' +
                 '</div>' +
                 '</div>';
         });
+
         $('#support-search-results').html(resultsHtml);
+
         $('.support-create-ticket-btn').on('click', function () {
             var solution = $(this).data('solution');
             var source = $(this).data('source');
@@ -459,52 +491,52 @@ var selectedSource = '';
     function displayTicketDetails(ticket) {
         if ($('#support-ticket-details-title').length === 0) {
             $('#support-ticket-details').html(`
-            <div class="support-ticket-details-header">
-                <h3 id="support-ticket-details-title"></h3>
-                <button id="support-ticket-details-back" class="support-button-secondary">
-                    ${mw.msg('supportsystem-sd-ticket-back') || 'Назад к списку'}
-                </button>
-            </div>
-            
-            <div class="support-ticket-details-info">
-                <div class="support-ticket-status">
-                    <span class="support-label">${mw.msg('supportsystem-sd-ticket-status') || 'Статус'}:</span>
-                    <span id="support-ticket-status"></span>
-                </div>
-                <div class="support-ticket-priority">
-                    <span class="support-label">${mw.msg('supportsystem-sd-ticket-priority') || 'Приоритет'}:</span>
-                    <span id="support-ticket-priority-value"></span>
-                </div>
-            </div>
-            
-            <div class="support-ticket-description-section">
-                <h4>${mw.msg('supportsystem-sd-ticket-description') || 'Описание'}</h4>
-                <div id="support-ticket-description-text" class="support-ticket-description-content"></div>
-            </div>
-            
-            <!-- Область для кастомных полей -->
-            <div id="support-ticket-custom-fields"></div>
-            
-            <!-- Область для вложений -->
-            <div id="support-ticket-attachments" class="support-ticket-attachments-section">
-                <h4>${mw.msg('supportsystem-attachment-list') || 'Вложения'}</h4>
-                <div class="support-attachments-list"></div>
-            </div>
-            
-            <!-- Область для комментариев -->
-            <div class="support-ticket-comments-section">
-                <h4>${mw.msg('supportsystem-sd-ticket-comments') || 'Комментарии'}</h4>
-                <div id="support-ticket-comments" class="support-ticket-comments-list"></div>
-                
-                <div class="support-comment-form">
-                    <textarea id="support-comment-text" class="support-textarea" 
-                        placeholder="${mw.msg('supportsystem-sd-ticket-comment-placeholder') || 'Введите ваш комментарий...'}"></textarea>
-                    <button id="support-comment-submit" class="support-button-primary">
-                        ${mw.msg('supportsystem-sd-ticket-comment-submit') || 'Отправить'}
+                <div class="support-ticket-details-header">
+                    <h3 id="support-ticket-details-title"></h3>
+                    <button id="support-ticket-details-back" class="support-button-secondary">
+                        ${mw.msg('supportsystem-sd-ticket-back') || 'Назад к списку'}
                     </button>
                 </div>
-            </div>
-        `);
+                
+                <div class="support-ticket-details-info">
+                    <div class="support-ticket-status">
+                        <span class="support-label">${mw.msg('supportsystem-sd-ticket-status') || 'Статус'}:</span>
+                        <span id="support-ticket-status"></span>
+                    </div>
+                    <div class="support-ticket-priority">
+                        <span class="support-label">${mw.msg('supportsystem-sd-ticket-priority') || 'Приоритет'}:</span>
+                        <span id="support-ticket-priority-value"></span>
+                    </div>
+                </div>
+                
+                <div class="support-ticket-description-section">
+                    <h4>${mw.msg('supportsystem-sd-ticket-description') || 'Описание'}</h4>
+                    <div id="support-ticket-description-text" class="support-ticket-description-content"></div>
+                </div>
+                
+                <!-- Область для кастомных полей -->
+                <div id="support-ticket-custom-fields"></div>
+                
+                <!-- Область для вложений -->
+                <div id="support-ticket-attachments" class="support-ticket-attachments-section">
+                    <h4>${mw.msg('supportsystem-attachment-list') || 'Вложения'}</h4>
+                    <div class="support-attachments-list"></div>
+                </div>
+                
+                <!-- Область для комментариев -->
+                <div class="support-ticket-comments-section">
+                    <h4>${mw.msg('supportsystem-sd-ticket-comments') || 'Комментарии'}</h4>
+                    <div id="support-ticket-comments" class="support-ticket-comments-list"></div>
+                    
+                    <div class="support-comment-form">
+                        <textarea id="support-comment-text" class="support-textarea" 
+                            placeholder="${mw.msg('supportsystem-sd-ticket-comment-placeholder') || 'Введите ваш комментарий...'}"></textarea>
+                        <button id="support-comment-submit" class="support-button-primary">
+                            ${mw.msg('supportsystem-sd-ticket-comment-submit') || 'Отправить'}
+                        </button>
+                    </div>
+                </div>
+            `);
             $('#support-ticket-details-back').on('click', function () {
                 $('#support-ticket-details').hide();
                 $('#support-tickets-list').show();
@@ -532,9 +564,7 @@ var selectedSource = '';
             3: { class: 'support-priority-green', name: 'Низкий' }
         };
         var priority = priorityMapping[6];
-        if (ticket.priority && ticket.priority.id) {
-            priority = priorityMapping[ticket.priority.id] || priority;
-        }
+        if (ticket.priority && ticket.priority.id) { priority = priorityMapping[ticket.priority.id] || priority; }
         $('#support-ticket-priority-value').text(priority.name)
             .removeClass()
             .addClass(priority.class);
@@ -552,14 +582,9 @@ var selectedSource = '';
                 }
             });
             customFieldsHtml += '</dl></div>';
-            if (hasVisibleFields) {
-                $('#support-ticket-custom-fields').html(customFieldsHtml);
-            } else {
-                $('#support-ticket-custom-fields').empty();
-            }
-        } else {
-            $('#support-ticket-custom-fields').empty();
-        }
+            if (hasVisibleFields) { $('#support-ticket-custom-fields').html(customFieldsHtml); } 
+            else { $('#support-ticket-custom-fields').empty(); }
+        } else { $('#support-ticket-custom-fields').empty(); }
         var attachmentsHtml = '';
         if (ticket.attachments && ticket.attachments.length > 0) {
             ticket.attachments.forEach(function (attachment) {
@@ -790,8 +815,12 @@ var selectedSource = '';
                     if (file.size > 10 * 1024 * 1024) {
                         mw.notify('Файл ' + file.name + ' превышает максимальный размер 10 МБ', { type: 'error' });
                         $(this).val('');
-                    } else { $('#support-file-upload-button').text('Загрузить ' + file.name + ' (' + fileSize + ')'); }
-                } else { $('#support-file-upload-button').text(mw.msg('supportsystem-attachment-upload') || 'Загрузить'); }
+                    } else {
+                        $('#support-file-upload-button').text('Загрузить ' + file.name + ' (' + fileSize + ')');
+                    }
+                } else {
+                    $('#support-file-upload-button').text(mw.msg('supportsystem-attachment-upload') || 'Загрузить');
+                }
             });
         }
     }
@@ -812,9 +841,9 @@ var selectedSource = '';
         $('#support-file-upload-form').hide();
         $('#support-file-upload-progress').show();
         var formData = new FormData();
-        formData.append('action', 'supportattachment');
+        formData.append('action', 'supportticket');
         formData.append('format', 'json');
-        formData.append('operation', 'upload');
+        formData.append('operation', 'attachment');
         formData.append('ticket_id', ticketId);
         formData.append('comment', comment);
         formData.append('token', mw.user.tokens.get('csrfToken'));
@@ -822,7 +851,7 @@ var selectedSource = '';
         fetch(mw.util.wikiScript('api'), {
             method: 'POST',
             body: formData,
-            credentials: ''
+            credentials: 'same-origin'
         })
             .then(function (response) {
                 return response.json();
@@ -861,6 +890,29 @@ var selectedSource = '';
         } else {
             return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
         }
+    }
+
+    /**
+     * Экранирование HTML-символов
+     * @param {string} str Строка для экранирования
+     * @return {string} Экранированная строка
+     */
+    function escapeHtml(str) {
+        return str
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    /**
+     * Экранирование символов регулярных выражений
+     * @param {string} str Строка для экранирования
+     * @return {string} Экранированная строка
+     */
+    function escapeRegExp(str) {
+        return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
     function submitTicket() {
@@ -960,41 +1012,6 @@ var selectedSource = '';
             .finally(function () {
                 $('#support-ticket-submit').prop('disabled', false).text('Отправить');
             });
-    }
-
-    /**
-     * Добавляет скрытое поле в форму
-     * @param {HTMLFormElement} form Форма
-     * @param {string} name Имя поля
-     * @param {string} value Значение поля
-     */
-    function addHiddenField(form, name, value) {
-        var field = form.querySelector('input[name="' + name + '"]');
-        if (!field) {
-            field = document.createElement('input');
-            field.type = 'hidden';
-            field.name = name;
-            form.appendChild(field);
-        }
-        field.value = value;
-    }
-
-    /**
-     * Показать сообщение об успешном создании заявки
-     * @param {number} ticketId ID заявки
-     */
-    function showTicketSuccess(ticketId) {
-        $('#support-ticket-form').hide();
-        $('#support-ticket-submit').prop('disabled', false);
-        $('#support-ticket-submit').text(mw.msg('supportsystem-dt-submit') || 'Submit');
-        $('#support-ticket-files').val('');
-        $('#support-file-list').empty();
-        mw.notify(
-            (messages.ticket_created || 'Ticket #{0} has been successfully created!').replace('{0}', ticketId),
-            { type: 'success', autoHide: false }
-        );
-        loadTickets();
-        showPanel('tickets');
     }
 
     /**

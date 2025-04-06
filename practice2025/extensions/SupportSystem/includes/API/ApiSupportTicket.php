@@ -60,6 +60,41 @@ class ApiSupportTicket extends ApiBase
                     } catch (MWException $e) { $this->dieWithError($e->getMessage()); }
                     break;
 
+                case 'attachment':
+                    $this->requirePostedParameters(['ticket_id']);
+                    $ticketId = $params['ticket_id'];
+                    $comment = $params['comment'] ?? '';
+                    if (!$ticketId) { $this->dieWithError(['apierror-invalidparameter', 'ticket_id']); }
+                    try {
+                        $attachments = [];
+                        $request = $this->getRequest();
+                        if ($request->wasPosted() && !empty($_FILES)) {
+                            foreach ($_FILES as $fileField => $fileData) {
+                                if (is_array($fileData['name'])) {
+                                    $fileCount = count($fileData['name']);
+                                    for ($i = 0; $i < $fileCount; $i++) {
+                                        $fileSize = $fileData['size'][$i];
+                                        if ($fileSize > 10 * 1024 * 1024) {
+                                            $this->dieWithError("File is too large (max size: 10MB)", 'file_too_large');
+                                        }
+                                    }
+                                } else {
+                                    $fileSize = $fileData['size'];
+                                    if ($fileSize > 10 * 1024 * 1024) {
+                                        $this->dieWithError("File is too large (max size: 10MB)", 'file_too_large');
+                                    }
+                                }
+                            }
+                            $attachments = $serviceDesk->processUploadedFiles($_FILES);
+                            if (!empty($attachments)) {
+                                $success = $serviceDesk->attachFilesToTicket($ticketId, $attachments, $comment);
+                                if ($success) { $this->getResult()->addValue(null, 'result', 'success'); } 
+                                else { $this->dieWithError('Failed to attach files to ticket', 'attachment_failed'); }
+                            } else { $this->dieWithError('No valid files were uploaded', 'no_files'); }
+                        } else { $this->dieWithError('No files were uploaded', 'no_files'); }
+                    } catch (MWException $e) { $this->dieWithError($e->getMessage()); }
+                    break;
+
                 case 'get':
                     $ticketId = $params['ticket_id'];
                     if (!$ticketId) { $this->dieWithError(['apierror-invalidparameter', 'ticket_id']); }
@@ -111,7 +146,7 @@ class ApiSupportTicket extends ApiBase
     {
         return [
             'operation' => [
-                ApiBase::PARAM_TYPE => ['create', 'get', 'list', 'comment', 'solution'],
+                ApiBase::PARAM_TYPE => ['create', 'get', 'list', 'comment', 'solution', 'attachment'],
                 ApiBase::PARAM_REQUIRED => true,
             ],
             'ticket_id' => [
@@ -171,7 +206,7 @@ class ApiSupportTicket extends ApiBase
     public function isWriteMode()
     {
         $operation = $this->getParameter('operation');
-        return in_array($operation, ['create', 'comment', 'solution']);
+        return in_array($operation, ['create', 'comment', 'solution', 'attachment']);
     }
 
     /**
@@ -181,6 +216,6 @@ class ApiSupportTicket extends ApiBase
     public function mustBePosted()
     {
         $operation = $this->getParameter('operation');
-        return in_array($operation, ['create', 'comment', 'solution']);
+        return in_array($operation, ['create', 'comment', 'solution', 'attachment']);
     }
 }

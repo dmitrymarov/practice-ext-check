@@ -36,9 +36,6 @@
         },
         "unifiedsearch": {
             "class": "MediaWiki\\Extension\\SupportSystem\\API\\ApiUnifiedSearch"
-        },
-        "supportattachment": {
-            "class": "MediaWiki\\Extension\\SupportSystem\\API\\ApiSupportAttachment"
         }
     },
     "Hooks": {

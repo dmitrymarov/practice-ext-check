@@ -67,9 +67,13 @@ class ServiceDesk
             "-d " . escapeshellarg($jsonData) . " " .
             "\"$url\"";
         $response = shell_exec($command);
-        if (!$response) { throw new MWException("Empty response from Redmine API"); }
+        if (!$response) {
+            throw new MWException("Empty response from Redmine API");
+        }
         $data = json_decode($response, true);
-        if (!isset($data['issue'])) { throw new MWException("Invalid response format from Redmine API: " . $response); }
+        if (!isset($data['issue'])) {
+            throw new MWException("Invalid response format from Redmine API: " . $response);
+        }
         return $data['issue'];
     }
 
@@ -128,6 +132,40 @@ class ServiceDesk
     }
 
     /**
+     * Attach files to an existing ticket
+     * 
+     * @param int $ticketId Ticket ID
+     * @param array $attachments Array of attachment tokens from uploadFile
+     * @param string $comment Optional comment to add with the attachments
+     * @return bool Success status
+     * @throws MWException When attachment fails
+     */
+    public function attachFilesToTicket(int $ticketId, array $attachments, string $comment = ''): bool
+    {
+        if (empty($attachments)) { return false; }
+        $issueData = [
+            'issue' => [
+                'notes' => $comment ?: 'Файлы прикреплены к заявке',
+                'uploads' => $attachments
+            ]
+        ];
+        $url = rtrim($this->apiUrl, '/') . "/issues/{$ticketId}.json";
+        $jsonData = json_encode($issueData);
+        $command = "curl -s -X PUT " .
+            "-H \"Content-Type: application/json\" " .
+            "-H \"X-Redmine-API-Key: {$this->apiKey}\" " .
+            "-d " . escapeshellarg($jsonData) . " " .
+            "\"$url\"";
+        $response = shell_exec($command);
+        if (empty($response)) { return true; }
+        $data = json_decode($response, true);
+        if (isset($data['errors'])) {
+            throw new MWException("Failed to attach files: " . implode(", ", $data['errors']));
+        }
+        return true;
+    }
+
+    /**
      * Attach a file to an existing ticket
      * 
      * @param int $ticketId Ticket ID
@@ -166,43 +204,6 @@ class ServiceDesk
             shell_exec($command);
             return true;
         } catch (MWException $e) { throw $e; }
-    }
-
-    /**
-     * Process uploaded files for a new ticket
-     * 
-     * @param array $files Files array ($_FILES)
-     * @return array Array of file upload information for ticket creation
-     */
-    public function processUploadedFiles(array $files): array
-    {
-        $uploadInfos = [];
-        if (empty($files)) { return $uploadInfos; }
-        foreach ($files as $fieldName => $fileInfo) {
-            if (is_array($fileInfo['name'])) {
-                $fileCount = count($fileInfo['name']);
-                for ($i = 0; $i < $fileCount; $i++) {
-                    if ($fileInfo['error'][$i] === UPLOAD_ERR_OK && !empty($fileInfo['tmp_name'][$i])) {
-                        $tmpName = $fileInfo['tmp_name'][$i];
-                        $fileName = $fileInfo['name'][$i];
-                        try {
-                            $uploadInfo = $this->uploadFile($tmpName, $fileName);
-                            $uploadInfos[] = $uploadInfo;
-                        } catch (MWException $e) {}
-                    }
-                }
-            } else {
-                if ($fileInfo['error'] === UPLOAD_ERR_OK && !empty($fileInfo['tmp_name'])) {
-                    $tmpName = $fileInfo['tmp_name'];
-                    $fileName = $fileInfo['name'];
-                    try {
-                        $uploadInfo = $this->uploadFile($tmpName, $fileName);
-                        $uploadInfos[] = $uploadInfo;
-                    } catch (MWException $e) { }
-                }
-            }
-        }
-        return $uploadInfos;
     }
 
     /**
@@ -257,5 +258,85 @@ class ServiceDesk
         $data = json_decode($response, true);
         if (!isset($data['issues'])) { return []; }
         return $data['issues'];
+    }
+    /**
+     * Process uploaded files for a new ticket
+     * 
+     * @param array $files Files array ($_FILES)
+     * @return array Array of file upload information for ticket creation
+     */
+    public function processUploadedFiles(array $files): array
+    {
+        $uploadInfos = [];
+        if (empty($files)) {
+            return $uploadInfos;
+        }
+
+        foreach ($files as $fieldName => $fileInfo) {
+            if (is_array($fileInfo['name'])) {
+                $fileCount = count($fileInfo['name']);
+                for ($i = 0; $i < $fileCount; $i++) {
+                    if ($fileInfo['error'][$i] === UPLOAD_ERR_OK && !empty($fileInfo['tmp_name'][$i])) {
+                        $tmpName = $fileInfo['tmp_name'][$i];
+                        $fileName = $fileInfo['name'][$i];
+                        try {
+                            $uploadInfo = $this->uploadFile($tmpName, $fileName);
+                            $uploadInfos[] = $uploadInfo;
+                        } catch (MWException $e) {
+                        }
+                    }
+                }
+            } else {
+                if ($fileInfo['error'] === UPLOAD_ERR_OK && !empty($fileInfo['tmp_name'])) {
+                    $tmpName = $fileInfo['tmp_name'];
+                    $fileName = $fileInfo['name'];
+                    try {
+                        $uploadInfo = $this->uploadFile($tmpName, $fileName);
+                        $uploadInfos[] = $uploadInfo;
+                    } catch (MWException $e) {
+                    }
+                }
+            }
+        }
+        return $uploadInfos;
+    }
+    
+    /**
+     * Attach a solution to a ticket
+     * 
+     * @param int $ticketId Ticket ID
+     * @param string $solution Solution text
+     * @param string $source Source of the solution
+     * @return bool Success status
+     */
+    public function attachSolution(int $ticketId, string $solution, string $source = 'unknown'): bool
+    {
+        try {
+            if (empty($solution)) { return false; }
+            $comment = "Решение из источника: $source\n\n" . substr($solution, 0, 30000);
+            $issueData = [
+                'issue' => [
+                    'notes' => $comment
+                ]
+            ];
+            $url = rtrim($this->apiUrl, '/') . "/issues/{$ticketId}.json";
+            $jsonData = json_encode($issueData);
+            $command = "curl -s -X PUT " .
+                "-H \"Content-Type: application/json\" " .
+                "-H \"X-Redmine-API-Key: {$this->apiKey}\" " .
+                "-d " . escapeshellarg($jsonData) . " " .
+                "\"$url\"";
+            $response = shell_exec($command);
+            if (empty($response)) { return true; }
+            $data = json_decode($response, true);
+            if (isset($data['errors'])) {
+                wfDebugLog('supportSystem', 'Error attaching solution: ' . implode(', ', $data['errors']));
+                return false;
+            }
+            return true;
+        } catch (\Exception $e) {
+            wfDebugLog('supportSystem', 'Exception in attachSolution: ' . $e->getMessage());
+            return false;
+        }
     }
 }
