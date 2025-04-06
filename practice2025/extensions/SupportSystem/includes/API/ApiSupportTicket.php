@@ -21,37 +21,27 @@ class ApiSupportTicket extends ApiBase
                     $description = $params['description'];
                     $priority = $params['priority'];
                     $assignedTo = $params['assigned_to'] ?? null;
-                    wfDebugLog('SupportSystem', "API: создание тикета: $subject, приоритет: $priority");
                     try {
                         $attachments = [];
                         $request = $this->getRequest();
-                        if ($request->wasPosted()) {
-                            wfDebugLog('SupportSystem', "Request was posted, checking for files: " . json_encode(array_keys($_FILES)));
-                            if (!empty($_FILES)) {
-                                wfDebugLog('SupportSystem', "Files found in request: " . json_encode($_FILES));
-                                foreach ($_FILES as $fileField => $fileData) {
-                                    if (is_array($fileData['name'])) {
-                                        $fileCount = count($fileData['name']);
-                                        for ($i = 0; $i < $fileCount; $i++) {
-                                            $fileSize = $fileData['size'][$i];
-                                            $fileName = $fileData['name'][$i];
-                                            if ($fileSize > 10 * 1024 * 1024) {
-                                                wfDebugLog('SupportSystem', "File $fileName too large: $fileSize bytes");
-                                                $this->dieWithError("File $fileName is too large (max size: 10MB)", 'file_too_large');
-                                            }
-                                        }
-                                    } else {
-                                        $fileSize = $fileData['size'];
-                                        $fileName = $fileData['name'];
+                        if ($request->wasPosted() && !empty($_FILES)) {
+                            foreach ($_FILES as $fileField => $fileData) {
+                                if (is_array($fileData['name'])) {
+                                    $fileCount = count($fileData['name']);
+                                    for ($i = 0; $i < $fileCount; $i++) {
+                                        $fileSize = $fileData['size'][$i];
                                         if ($fileSize > 10 * 1024 * 1024) {
-                                            wfDebugLog('SupportSystem', "File $fileName too large: $fileSize bytes");
-                                            $this->dieWithError("File $fileName is too large (max size: 10MB)", 'file_too_large');
+                                            $this->dieWithError("File is too large (max size: 10MB)", 'file_too_large');
                                         }
                                     }
+                                } else {
+                                    $fileSize = $fileData['size'];
+                                    if ($fileSize > 10 * 1024 * 1024) {
+                                        $this->dieWithError("File is too large (max size: 10MB)", 'file_too_large');
+                                    }
                                 }
-                                $attachments = $serviceDesk->processUploadedFiles($_FILES);
-                                wfDebugLog('SupportSystem', "Processed attachments: " . json_encode($attachments));
                             }
+                            $attachments = $serviceDesk->processUploadedFiles($_FILES);
                         }
                         $ticket = $serviceDesk->createTicket(
                             $subject,
@@ -61,18 +51,13 @@ class ApiSupportTicket extends ApiBase
                             1,
                             $attachments
                         );
-                        wfDebugLog('SupportSystem', "API: Ticket created successfully, ID: " . $ticket['id']);
                         if (isset($params['solution']) && !empty($params['solution'])) {
                             $solution = $params['solution'];
                             $source = $params['source'] ?? 'unknown';
-                            wfDebugLog('SupportSystem', "API: Attaching solution to new ticket " . $ticket['id']);
                             $serviceDesk->attachSolution($ticket['id'], $solution, $source);
                         }
                         $this->getResult()->addValue(null, 'ticket', $ticket);
-                    } catch (MWException $e) {
-                        wfDebugLog('SupportSystem', "API: ошибка создания тикета: " . $e->getMessage());
-                        $this->dieWithError($e->getMessage());
-                    }
+                    } catch (MWException $e) { $this->dieWithError($e->getMessage()); }
                     break;
 
                 case 'get':
@@ -107,15 +92,13 @@ class ApiSupportTicket extends ApiBase
                     $source = $params['source'];
                     if (!$ticketId) { $this->dieWithError(['apierror-invalidparameter', 'ticket_id']); }
                     $success = $serviceDesk->attachSolution($ticketId, $solution, $source);
-                    if ($success) { $this->getResult()->addValue(null, 'result', 'success'); }
+                    if ($success) { $this->getResult()->addValue(null, 'result', 'success'); } 
                     else { $this->dieWithError('supportsystem-error-attach-solution-failed'); }
                     break;
-
                 default:
                     $this->dieWithError(['apierror-invalidparameter', 'operation']);
             }
         } catch (MWException $e) {
-            wfDebugLog('SupportSystem', "API exception: " . $e->getMessage());
             $this->dieWithError($e->getMessage());
         }
     }

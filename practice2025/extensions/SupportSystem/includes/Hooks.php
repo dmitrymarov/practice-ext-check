@@ -8,7 +8,6 @@ use Skin;
 class Hooks
 {
 	/**
-	 * Обработчик хука BeforePageDisplay
 	 * @param OutputPage $out
 	 * @param Skin $skin
 	 */
@@ -23,8 +22,6 @@ class Hooks
 					'messages' => [
 						'error_loading_node' => $out->msg('supportsystem-dt-error-loading-node')->text(),
 						'error_creating_ticket' => $out->msg('supportsystem-dt-error-creating-ticket')->text(),
-						'ai_error' => $out->msg('supportsystem-dt-ai-error')->text(),
-						'ai_loading' => $out->msg('supportsystem-dt-ai-loading')->text(),
 						'search_loading' => $out->msg('supportsystem-search-loading')->text(),
 						'search_empty' => $out->msg('supportsystem-search-empty-query')->text(),
 						'search_error' => $out->msg('supportsystem-search-error')->text(),

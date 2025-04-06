@@ -31,25 +31,15 @@ class SpecialUnifiedSupport extends SpecialPage
 
         $out = $this->getOutput();
         $out->setPageTitle($this->msg('supportsystem-unified-title'));
-
-        // Add modules and styles
         $out->addModules('ext.supportSystem.unified');
-        
-        // Add description
         $out->addWikiTextAsInterface($this->msg('supportsystem-unified-desc')->text());
-
-        // Create the main container
         $html = $this->createMainContainer();
         $out->addHTML($html);
-        
-        // Add JS config
         $out->addJsConfigVars([
             'supportsystemConfig' => [
                 'messages' => [
                     'error_loading_node' => $this->msg('supportsystem-dt-error-loading-node')->text(),
                     'error_creating_ticket' => $this->msg('supportsystem-dt-error-creating-ticket')->text(),
-                    'ai_error' => $this->msg('supportsystem-dt-ai-error')->text(),
-                    'ai_loading' => $this->msg('supportsystem-dt-ai-loading')->text(),
                     'search_loading' => $this->msg('supportsystem-search-loading')->text(),
                     'search_empty' => $this->msg('supportsystem-search-empty-query')->text(),
                     'search_error' => $this->msg('supportsystem-search-error')->text(),
@@ -179,40 +169,8 @@ HTML;
             <button id="support-create-ticket-button" class="support-button-primary">
                 {$this->msg('supportsystem-dt-create-ticket')->escaped()}
             </button>
-            <button id="support-ai-search-button" class="support-button-accent">
-                {$this->msg('supportsystem-dt-ai-search')->escaped()}
-            </button>
             <button id="support-wiki-search-button" class="support-button-accent">
                 {$this->msg('supportsystem-dt-wiki-search')->escaped()}
-            </button>
-        </div>
-    </div>
-    
-    <div class="support-ai-container" id="support-ai-container" style="display: none;">
-        <div class="support-ai-box">
-            <h4>{$this->msg('supportsystem-dt-ai-header')->escaped()}</h4>
-            <div id="support-ai-loading" class="support-loading">
-                <div class="support-spinner"></div>
-                <p>{$this->msg('supportsystem-dt-ai-loading')->escaped()}</p>
-            </div>
-            <div id="support-ai-content" style="display: none;">
-                <p id="support-ai-text"></p>
-                <div id="support-ai-sources" class="support-ai-sources" style="display: none;">
-                    <h5>{$this->msg('supportsystem-dt-ai-sources')->escaped()}</h5>
-                    <ul id="support-ai-sources-list"></ul>
-                </div>
-            </div>
-        </div>
-        
-        <div class="support-ai-actions">
-            <button id="support-ai-accept-button" class="support-button-primary">
-                {$this->msg('supportsystem-dt-ai-accept')->escaped()}
-            </button>
-            <button id="support-ai-ticket-button" class="support-button-primary">
-                {$this->msg('supportsystem-dt-create-ticket')->escaped()}
-            </button>
-            <button id="support-ai-back-button" class="support-button-secondary">
-                {$this->msg('supportsystem-dt-back')->escaped()}
             </button>
         </div>
     </div>
@@ -241,13 +199,6 @@ HTML;
         <button id="support-search-button" class="support-button-primary">
             {$this->msg('supportsystem-search-button')->escaped()}
         </button>
-    </div>
-    
-    <div class="support-search-options">
-        <label>
-            <input type="checkbox" id="support-search-use-ai" class="support-checkbox">
-            {$this->msg('supportsystem-search-use-ai')->escaped()}
-        </label>
     </div>
     
     <div id="support-search-results" class="support-search-results">
@@ -284,7 +235,7 @@ HTML;
         </div>
     </div>
     
-    <div id="support-ticket-details" class <div id="support-ticket-details" class="support-ticket-details" style="display: none;">
+    <div id="support-ticket-details" class="support-ticket-details" style="display: none;">
         <div class="support-ticket-details-header">
             <h3 id="support-ticket-details-title"></h3>
             <button id="support-ticket-details-back" class="support-button-secondary">

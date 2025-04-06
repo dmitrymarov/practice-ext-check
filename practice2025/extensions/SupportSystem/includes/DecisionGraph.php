@@ -16,9 +16,6 @@ class DecisionGraph
     /** @var string The path to the graph data file */
     private $filePath;
 
-    /**
-     * Constructor
-     */
     public function __construct()
     {
         $config = MediaWikiServices::getInstance()->getMainConfig();
@@ -26,16 +23,12 @@ class DecisionGraph
         $this->loadGraph();
     }
 
-    /**
-     * Load the graph from a file
-     */
     private function loadGraph(): void
     {
         if (file_exists($this->filePath)) {
             $content = file_get_contents($this->filePath);
             $this->graph = FormatJson::decode($content, true);
         } else {
-            // Create a default graph if file doesn't exist
             $this->graph = $this->createDefaultGraph();
             $this->saveGraph();
         }
@@ -148,11 +141,7 @@ class DecisionGraph
      */
     public function getRootNode(): ?string
     {
-        if (empty($this->graph['nodes'])) {
-            return null;
-        }
-
-        // First node is assumed to be the root
+        if (empty($this->graph['nodes'])) { return null; }
         return $this->graph['nodes'][0]['id'];
     }
 
@@ -164,11 +153,8 @@ class DecisionGraph
     public function getNode(string $nodeId): ?array
     {
         foreach ($this->graph['nodes'] as $node) {
-            if ($node['id'] === $nodeId) {
-                return $node;
-            }
+            if ($node['id'] === $nodeId) { return $node; }
         }
-
         return null;
     }
 
@@ -180,7 +166,6 @@ class DecisionGraph
     public function getChildren(string $nodeId): array
     {
         $children = [];
-
         foreach ($this->graph['edges'] as $edge) {
             if ($edge['source'] === $nodeId) {
                 $targetNode = $this->getNode($edge['target']);
@@ -194,7 +179,6 @@ class DecisionGraph
                 }
             }
         }
-
         return $children;
     }
     
@@ -205,18 +189,10 @@ class DecisionGraph
      */
     public function addNode(array $node): bool
     {
-        // Validate required fields
-        if (!isset($node['id']) || !isset($node['content']) || !isset($node['type'])) {
-            return false;
-        }
-        
-        // Check if node already exists
+        if (!isset($node['id']) || !isset($node['content']) || !isset($node['type'])) { return false; }
         foreach ($this->graph['nodes'] as $existingNode) {
-            if ($existingNode['id'] === $node['id']) {
-                return false;
-            }
+            if ($existingNode['id'] === $node['id']) { return false; }
         }
-        
         $this->graph['nodes'][] = $node;
         return true;
     }
@@ -231,31 +207,19 @@ class DecisionGraph
     {
         foreach ($this->graph['nodes'] as $key => $node) {
             if ($node['id'] === $nodeId) {
-                // If ID is being changed, update all edges as well
                 if (isset($nodeData['id']) && $nodeData['id'] !== $nodeId) {
                     $newId = $nodeData['id'];
-                    
-                    // Update source references
                     foreach ($this->graph['edges'] as $edgeKey => $edge) {
-                        if ($edge['source'] === $nodeId) {
-                            $this->graph['edges'][$edgeKey]['source'] = $newId;
-                        }
+                        if ($edge['source'] === $nodeId) { $this->graph['edges'][$edgeKey]['source'] = $newId; }
                     }
-                    
-                    // Update target references
                     foreach ($this->graph['edges'] as $edgeKey => $edge) {
-                        if ($edge['target'] === $nodeId) {
-                            $this->graph['edges'][$edgeKey]['target'] = $newId;
-                        }
+                        if ($edge['target'] === $nodeId) { $this->graph['edges'][$edgeKey]['target'] = $newId; }
                     }
                 }
-                
-                // Update node data
                 $this->graph['nodes'][$key] = array_merge($node, $nodeData);
                 return true;
             }
         }
-        
         return false;
     }
     
@@ -267,30 +231,19 @@ class DecisionGraph
     public function deleteNode(string $nodeId): bool
     {
         $found = false;
-        
-        // Remove node
         foreach ($this->graph['nodes'] as $key => $node) {
             if ($node['id'] === $nodeId) {
                 unset($this->graph['nodes'][$key]);
-                $this->graph['nodes'] = array_values($this->graph['nodes']); // Re-index array
+                $this->graph['nodes'] = array_values($this->graph['nodes']);
                 $found = true;
                 break;
             }
         }
-        
-        if (!$found) {
-            return false;
-        }
-        
-        // Remove all edges connected to this node
+        if (!$found) { return false; }
         foreach ($this->graph['edges'] as $key => $edge) {
-            if ($edge['source'] === $nodeId || $edge['target'] === $nodeId) {
-                unset($this->graph['edges'][$key]);
-            }
+            if ($edge['source'] === $nodeId || $edge['target'] === $nodeId) { unset($this->graph['edges'][$key]); }
         }
-        
-        $this->graph['edges'] = array_values($this->graph['edges']); // Re-index array
-        
+        $this->graph['edges'] = array_values($this->graph['edges']);
         return true;
     }
     
@@ -301,35 +254,17 @@ class DecisionGraph
      */
     public function addEdge(array $edge): bool
     {
-        // Validate required fields
-        if (!isset($edge['source']) || !isset($edge['target'])) {
-            return false;
-        }
-        
-        // Check if source and target nodes exist
+        if (!isset($edge['source']) || !isset($edge['target'])) { return false; }
         $sourceExists = false;
         $targetExists = false;
-        
         foreach ($this->graph['nodes'] as $node) {
-            if ($node['id'] === $edge['source']) {
-                $sourceExists = true;
-            }
-            if ($node['id'] === $edge['target']) {
-                $targetExists = true;
-            }
+            if ($node['id'] === $edge['source']) { $sourceExists = true; }
+            if ($node['id'] === $edge['target']) { $targetExists = true; }
         }
-        
-        if (!$sourceExists || !$targetExists) {
-            return false;
-        }
-        
-        // Check if edge already exists
+        if (!$sourceExists || !$targetExists) { return false; }
         foreach ($this->graph['edges'] as $existingEdge) {
-            if ($existingEdge['source'] === $edge['source'] && $existingEdge['target'] === $edge['target']) {
-                return false;
-            }
+            if ($existingEdge['source'] === $edge['source'] && $existingEdge['target'] === $edge['target']) { return false; }
         }
-        
         $this->graph['edges'][] = $edge;
         return true;
     }
@@ -342,33 +277,18 @@ class DecisionGraph
      */
     public function updateEdge(int $edgeIndex, array $edgeData): bool
     {
-        if (!isset($this->graph['edges'][$edgeIndex])) {
-            return false;
-        }
-        
-        // Validate required fields if changing source/target
+        if (!isset($this->graph['edges'][$edgeIndex])) { return false; }
         if ((isset($edgeData['source']) || isset($edgeData['target']))) {
             $sourceNode = isset($edgeData['source']) ? $edgeData['source'] : $this->graph['edges'][$edgeIndex]['source'];
             $targetNode = isset($edgeData['target']) ? $edgeData['target'] : $this->graph['edges'][$edgeIndex]['target'];
-            
             $sourceExists = false;
             $targetExists = false;
-            
             foreach ($this->graph['nodes'] as $node) {
-                if ($node['id'] === $sourceNode) {
-                    $sourceExists = true;
-                }
-                if ($node['id'] === $targetNode) {
-                    $targetExists = true;
-                }
+                if ($node['id'] === $sourceNode) { $sourceExists = true; }
+                if ($node['id'] === $targetNode) { $targetExists = true; }
             }
-            
-            if (!$sourceExists || !$targetExists) {
-                return false;
-            }
+            if (!$sourceExists || !$targetExists) { return false; }
         }
-        
-        // Update edge data
         $this->graph['edges'][$edgeIndex] = array_merge($this->graph['edges'][$edgeIndex], $edgeData);
         return true;
     }
@@ -380,13 +300,9 @@ class DecisionGraph
      */
     public function deleteEdge(int $edgeIndex): bool
     {
-        if (!isset($this->graph['edges'][$edgeIndex])) {
-            return false;
-        }
-        
+        if (!isset($this->graph['edges'][$edgeIndex])) { return false; }
         unset($this->graph['edges'][$edgeIndex]);
-        $this->graph['edges'] = array_values($this->graph['edges']); // Re-index array
-        
+        $this->graph['edges'] = array_values($this->graph['edges']);
         return true;
     }
 }

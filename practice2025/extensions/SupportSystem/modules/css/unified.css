@@ -173,9 +173,7 @@
 }
 
 /* Solution/AI result containers */
-.support-solution-container,
-.support-ai-container,
-.support-ai-result {
+.support-solution-container{
     background-color: white;
     border: 1px solid #ddd;
     border-radius: 8px;
@@ -185,8 +183,6 @@
 }
 
 .support-solution-box,
-.support-ai-box,
-.support-ai-answer,
 .support-solution-display {
     background-color: #f9f9f9;
     padding: 15px;
@@ -200,22 +196,7 @@
     border-radius: 0 4px 4px 0;
 }
 
-.support-ai-box,
-.support-ai-answer {
-    border-left: 4px solid #17a2b8;
-    border-radius: 0 4px 4px 0;
-    background-color: #f0f7fb;
-}
-
-.support-ai-sources {
-    background-color: #f0f0f0;
-    padding: 10px 15px;
-    border-radius: 4px;
-    margin-top: 15px;
-}
-
 .support-solution-actions,
-.support-ai-actions,
 .support-result-actions {
     display: flex;
     flex-wrap: wrap;
@@ -590,7 +571,6 @@
     display: block;
     width: 100%;
     padding: 8px;
-    margin-bottom: 10px;
     background-color: #f8f9fa;
     border: 1px dashed #ddd;
     border-radius: 4px;
@@ -602,8 +582,12 @@
 }
 
 .support-file-list {
-    margin-top: 5px;
-    font-size: 0.9em;
+    margin-top: 10px;
+    padding: 8px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    max-height: 150px;
+    overflow-y: auto;
 }
 
 .support-file-list ul {
@@ -612,7 +596,23 @@
 }
 
 .support-file-list li {
-    margin-bottom: 3px;
+    margin-bottom: 5px;
+}
+
+.support-file-too-large {
+    color: #dc3545;
+}
+
+.support-file-error {
+    color: #dc3545;
+    font-weight: 500;
+}
+
+.support-file-help {
+    display: block;
+    margin-top: 5px;
+    color: #6c757d;
+    font-size: 0.9em;
 }
 
 /* Ticket description content */
@@ -841,14 +841,12 @@
     }
 
     .support-result-actions,
-    .support-solution-actions,
-    .support-ai-actions {
+    .support-solution-actions{
         flex-direction: column;
     }
 
     .support-result-actions>*,
-    .support-solution-actions>*,
-    .support-ai-actions>* {
+    .support-solution-actions>*{
         margin-top: 10px;
         width: 100%;
     }

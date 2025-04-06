@@ -30,19 +30,13 @@ class SpecialDecisionGraphAdmin extends SpecialPage
 
         $this->setHeaders();
         $this->outputHeader();
-
+        
         $out = $this->getOutput();
         $out->setPageTitle($this->msg('supportsystem-graphadmin-title'));
         $out->addModules('ext.supportSystem.graphAdmin');
-
-        // Get graph data
         $graph = new DecisionGraph();
         $graphData = $graph->getGraph();
-
-        // Add description
         $out->addWikiTextAsInterface($this->msg('supportsystem-graphadmin-desc')->text());
-
-        // Create the graph editor interface
         $out->addHTML($this->createGraphEditorInterface($graphData));
     }
 

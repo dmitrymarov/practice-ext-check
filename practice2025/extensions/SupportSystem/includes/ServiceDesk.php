@@ -61,17 +61,13 @@ class ServiceDesk
         if (!empty($attachments)) { $issueData['issue']['uploads'] = $attachments; }
         $url = rtrim($this->apiUrl, '/') . "/issues.json";
         $jsonData = json_encode($issueData);
-        wfDebugLog('SupportSystem', "Creating ticket with data: " . json_encode($issueData, JSON_UNESCAPED_UNICODE));
         $command = "curl -s -X POST " .
             "-H \"Content-Type: application/json\" " .
             "-H \"X-Redmine-API-Key: {$this->apiKey}\" " .
             "-d " . escapeshellarg($jsonData) . " " .
             "\"$url\"";
-        wfDebugLog('SupportSystem', "Create ticket command (redacted): " .
-            preg_replace('/X-Redmine-API-Key: [^ ]+/', 'X-Redmine-API-Key: [REDACTED]', $command));
         $response = shell_exec($command);
         if (!$response) { throw new MWException("Empty response from Redmine API"); }
-        wfDebugLog('SupportSystem', "Create ticket response: $response");
         $data = json_decode($response, true);
         if (!isset($data['issue'])) { throw new MWException("Invalid response format from Redmine API: " . $response); }
         return $data['issue'];
@@ -92,7 +88,7 @@ class ServiceDesk
             'green' => 4    // Low
         ];
         $priorityName = strtolower($priorityName);
-        return $priorities[$priorityName] ?? 3; // Default to Normal
+        return $priorities[$priorityName] ?? 3;
     }
 
     /**
@@ -100,40 +96,30 @@ class ServiceDesk
      * 
      * @param string $filePath Path to the file
      * @param string $fileName Optional filename (if different from the actual file)
-     * @param string $contentType Content type of the file
      * @return array Upload info with token, filename and content_type
      * @throws MWException When upload fails
      */
     public function uploadFile(string $filePath, string $fileName = ''): array
     {
         if (!file_exists($filePath)) {
-            wfDebugLog('SupportSystem', "Error: File not found: $filePath");
-            throw new MWException("File not found: $filePath");
+            throw new MWException("Файл не найден: $filePath");
         }
         if (empty($fileName)) { $fileName = basename($filePath); }
         $finfo = new \finfo(FILEINFO_MIME_TYPE);
         $contentType = $finfo->file($filePath);
-        $fileSize = filesize($filePath);
-        wfDebugLog('SupportSystem', "Uploading file: $fileName, size: $fileSize bytes, type: $contentType");
         $url = rtrim($this->apiUrl, '/') . "/uploads.json";
         $encodedFilename = urlencode($fileName);
         $command = "curl -s -X POST -H \"Content-Type: application/octet-stream\" -H \"X-Redmine-API-Key: {$this->apiKey}\" " .
             "--data-binary @" . escapeshellarg($filePath) . " " .
             "\"$url?filename=$encodedFilename\"";
-        wfDebugLog('SupportSystem', "File upload command (redacted): " .
-            preg_replace('/X-Redmine-API-Key: [^ ]+/', 'X-Redmine-API-Key: [REDACTED]', $command));
         $response = shell_exec($command);
         if (!$response) {
-            wfDebugLog('SupportSystem', "Error: Empty response from Redmine API when uploading file");
-            throw new MWException("Empty response from Redmine API when uploading file");
+            throw new MWException("Пустой ответ от Redmine API при загрузке файла");
         }
-        wfDebugLog('SupportSystem', "Upload response: $response");
         $data = json_decode($response, true);
         if (!$data || !isset($data['upload']) || !isset($data['upload']['token'])) {
-            wfDebugLog('SupportSystem', "Error: Invalid JSON response format: $response");
-            throw new MWException("Invalid response format from Redmine API: $response");
+            throw new MWException("Неверный формат ответа от Redmine API: $response");
         }
-        wfDebugLog('SupportSystem', "Successfully uploaded file, received token: " . $data['upload']['token']);
         return [
             'token' => $data['upload']['token'],
             'filename' => $fileName,
@@ -152,10 +138,15 @@ class ServiceDesk
      * @return bool Success status
      * @throws MWException On error
      */
-    public function attachFileToTicket(int $ticketId, string $filePath, string $fileName = '', string $contentType = '', string $comment = ''): bool
-    {
+    public function attachFileToTicket(
+        int $ticketId,
+        string $filePath,
+        string $fileName = '',
+        string $contentType = '',
+        string $comment = ''
+    ): bool {
         try {
-            $uploadInfo = $this->uploadFile($filePath, $fileName, $contentType);
+            $uploadInfo = $this->uploadFile($filePath, $fileName);
             $issueData = [
                 'issue' => [
                     'notes' => $comment ?: 'Файл прикреплен',
@@ -163,27 +154,18 @@ class ServiceDesk
                         [
                             'token' => $uploadInfo['token'],
                             'filename' => $uploadInfo['filename'],
-                            'content_type' => $uploadInfo['content_type']
+                            'content_type' => $contentType ?: $uploadInfo['content_type']
                         ]
                     ]
                 ]
             ];
             $url = rtrim($this->apiUrl, '/') . "/issues/{$ticketId}.json";
             $jsonData = json_encode($issueData);
-            $command = sprintf(
-                'curl -s -X PUT -H "Content-Type: application/json" -H "X-Redmine-API-Key: %s" -d %s "%s"',
-                $this->apiKey,
-                escapeshellarg($jsonData),
-                $url
-            );
-            wfDebugLog('SupportSystem', "Attach file command: " . preg_replace('/X-Redmine-API-Key: [^ ]+/', 'X-Redmine-API-Key: [REDACTED]', $command));
-            $response = shell_exec($command);
-            wfDebugLog('SupportSystem', "Attach response: " . ($response ?: 'Empty response (expected for successful update)'));
+            $command = "curl -s -X PUT -H \"Content-Type: application/json\" -H \"X-Redmine-API-Key: {$this->apiKey}\" " .
+                "-d " . escapeshellarg($jsonData) . " \"$url\"";
+            shell_exec($command);
             return true;
-        } catch (MWException $e) {
-            wfDebugLog('SupportSystem', "Error attaching file: " . $e->getMessage());
-            throw $e;
-        }
+        } catch (MWException $e) { throw $e; }
     }
 
     /**
@@ -195,35 +177,29 @@ class ServiceDesk
     public function processUploadedFiles(array $files): array
     {
         $uploadInfos = [];
-        if (empty($files)) {
-            wfDebugLog('SupportSystem', "No files to process");
-            return $uploadInfos;
-        }
-        wfDebugLog('SupportSystem', "Processing uploaded files");
-        if (isset($files['ticket_files'])) {
-            if (is_array($files['ticket_files']['name'])) {
-                $fileCount = count($files['ticket_files']['name']);
-                wfDebugLog('SupportSystem', "Processing $fileCount files");
+        if (empty($files)) { return $uploadInfos; }
+        foreach ($files as $fieldName => $fileInfo) {
+            if (is_array($fileInfo['name'])) {
+                $fileCount = count($fileInfo['name']);
                 for ($i = 0; $i < $fileCount; $i++) {
-                    if ($files['ticket_files']['error'][$i] === UPLOAD_ERR_OK) {
-                        $tmpName = $files['ticket_files']['tmp_name'][$i];
-                        $fileName = $files['ticket_files']['name'][$i];
+                    if ($fileInfo['error'][$i] === UPLOAD_ERR_OK && !empty($fileInfo['tmp_name'][$i])) {
+                        $tmpName = $fileInfo['tmp_name'][$i];
+                        $fileName = $fileInfo['name'][$i];
                         try {
                             $uploadInfo = $this->uploadFile($tmpName, $fileName);
                             $uploadInfos[] = $uploadInfo;
-                            wfDebugLog('SupportSystem', "File $fileName uploaded successfully");
-                        } catch (MWException $e) { wfDebugLog('SupportSystem', "Error uploading file $fileName: " . $e->getMessage()); }
+                        } catch (MWException $e) {}
                     }
                 }
-            }
-            else if ($files['ticket_files']['error'] === UPLOAD_ERR_OK) {
-                $tmpName = $files['ticket_files']['tmp_name'];
-                $fileName = $files['ticket_files']['name'];
-                try {
-                    $uploadInfo = $this->uploadFile($tmpName, $fileName);
-                    $uploadInfos[] = $uploadInfo;
-                    wfDebugLog('SupportSystem', "File $fileName uploaded successfully");
-                } catch (MWException $e) { wfDebugLog('SupportSystem', "Error uploading file $fileName: " . $e->getMessage()); }
+            } else {
+                if ($fileInfo['error'] === UPLOAD_ERR_OK && !empty($fileInfo['tmp_name'])) {
+                    $tmpName = $fileInfo['tmp_name'];
+                    $fileName = $fileInfo['name'];
+                    try {
+                        $uploadInfo = $this->uploadFile($tmpName, $fileName);
+                        $uploadInfos[] = $uploadInfo;
+                    } catch (MWException $e) { }
+                }
             }
         }
         return $uploadInfos;
@@ -238,15 +214,9 @@ class ServiceDesk
     public function getTicket(int $ticketId): ?array
     {
         $url = rtrim($this->apiUrl, '/') . "/issues/{$ticketId}.json?include=journals,attachments";
-        $command = sprintf(
-            'curl -s -H "X-Redmine-API-Key: %s" "%s"',
-            $this->apiKey,
-            $url
-        );
-        wfDebugLog('SupportSystem', "Get ticket command: " . preg_replace('/X-Redmine-API-Key: [^ ]+/', 'X-Redmine-API-Key: [REDACTED]', $command));
+        $command = "curl -s -H \"X-Redmine-API-Key: {$this->apiKey}\" \"$url\"";
         $response = shell_exec($command);
         if (!$response) { return null; }
-        wfDebugLog('SupportSystem', "Get ticket response received (length: " . strlen($response) . ")");
         $data = json_decode($response, true);
         if (!isset($data['issue'])) { return null; }
         return $data['issue'];
@@ -261,22 +231,13 @@ class ServiceDesk
      */
     public function addComment(int $ticketId, string $comment): bool
     {
-        $issueData = [
-            'issue' => [
-                'notes' => $comment
-            ]
+        $issueData = ['issue' => [ 'notes' => $comment ]
         ];
         $url = rtrim($this->apiUrl, '/') . "/issues/{$ticketId}.json";
         $jsonData = json_encode($issueData);
-        $command = sprintf(
-            'curl -s -X PUT -H "Content-Type: application/json" -H "X-Redmine-API-Key: %s" -d %s "%s"',
-            $this->apiKey,
-            escapeshellarg($jsonData),
-            $url
-        );
-        wfDebugLog('SupportSystem', "Add comment command: " . preg_replace('/X-Redmine-API-Key: [^ ]+/', 'X-Redmine-API-Key: [REDACTED]', $command));
-        $response = shell_exec($command);
-        wfDebugLog('SupportSystem', "Add comment response: " . ($response ?: 'Empty response (expected for successful update)'));
+        $command = "curl -s -X PUT -H \"Content-Type: application/json\" -H \"X-Redmine-API-Key: {$this->apiKey}\" " .
+            "-d " . escapeshellarg($jsonData) . " \"$url\"";
+        shell_exec($command);
         return true;
     }
 
@@ -290,33 +251,11 @@ class ServiceDesk
     public function getAllTickets(int $limit = 25, int $offset = 0): array
     {
         $url = rtrim($this->apiUrl, '/') . "/issues.json?limit=$limit&offset=$offset";
-        $command = sprintf(
-            'curl -s -H "X-Redmine-API-Key: %s" "%s"',
-            $this->apiKey,
-            $url
-        );
-        wfDebugLog('SupportSystem', "Get all tickets command: " . preg_replace('/X-Redmine-API-Key: [^ ]+/', 'X-Redmine-API-Key: [REDACTED]', $command));
+        $command = "curl -s -H \"X-Redmine-API-Key: {$this->apiKey}\" \"$url\"";
         $response = shell_exec($command);
         if (!$response) { return []; }
-        wfDebugLog('SupportSystem', "Get all tickets response received (length: " . strlen($response) . ")");
         $data = json_decode($response, true);
-        if (!isset($data['issues'])) {
-            return [];
-        }
+        if (!isset($data['issues'])) { return []; }
         return $data['issues'];
-    }
-
-    /**
-     * Attach a solution to a ticket
-     * 
-     * @param int $ticketId Ticket ID
-     * @param string $solutionText Solution text
-     * @param string $source Solution source
-     * @return bool Whether attaching the solution was successful
-     */
-    public function attachSolution(int $ticketId, string $solutionText, string $source = 'unknown'): bool
-    {
-        $comment = "Найденное решение: {$solutionText}\n\nИсточник: {$source}";
-        return $this->addComment($ticketId, $comment);
     }
 }

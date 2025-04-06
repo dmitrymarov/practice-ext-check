@@ -25,29 +25,23 @@ class ApiSupportGraphAdmin extends ApiBase
                 $graphData = $graph->getGraph();
                 $this->getResult()->addValue(null, 'graph', $graphData);
                 break;
-
             case 'save':
                 $this->requirePostedParameters(['nodes', 'edges']);
                 $nodes = json_decode($params['nodes'], true);
                 $edges = json_decode($params['edges'], true);
-
                 if (!is_array($nodes) || !is_array($edges)) {
                     $this->dieWithError('Invalid graph data format', 'invalidformat');
                     return;
                 }
-
                 $graph->setGraph([
                     'nodes' => $nodes,
                     'edges' => $edges
                 ]);
-
                 $success = $graph->saveGraph();
-
                 if (!$success) {
                     $this->dieWithError('Failed to save graph', 'savefailed');
                     return;
                 }
-
                 $this->getResult()->addValue(null, 'result', 'success');
                 break;
 
