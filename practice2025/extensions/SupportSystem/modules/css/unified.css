@@ -94,7 +94,6 @@
     background-color: #138496;
 }
 
-/* Диалоговый модуль */
 .support-chat-container {
     height: 400px;
     overflow-y: auto;
@@ -171,7 +170,6 @@
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
-/* Общие стили для контейнеров решений и AI */
 .support-solution-container,
 .support-ai-container,
 .support-ai-result {
@@ -222,7 +220,6 @@
     margin-top: 20px;
 }
 
-/* Поисковый модуль */
 .support-search-container {
     margin-bottom: 20px;
 }
@@ -252,7 +249,6 @@
     margin-top: 20px;
 }
 
-/* Стили для сообщений пользователю */
 .support-search-initial-message,
 .support-no-results,
 .support-empty-list,
@@ -265,7 +261,6 @@
     margin-bottom: 20px;
 }
 
-/* Результаты поиска */
 .support-result-card {
     margin-bottom: 20px;
     background-color: white;
@@ -310,7 +305,6 @@
     margin-bottom: 5px;
 }
 
-/* Бейджи */
 .support-badge,
 .support-score-badge,
 .support-status-badge,
@@ -376,7 +370,6 @@
     margin-bottom: 20px;
 }
 
-/* Модуль заявок */
 .support-tickets-container {
     margin-bottom: 20px;
 }
@@ -806,5 +799,33 @@
             background-color: #f44336; /* Красный */
             color: white;
         }
-    
+    .support-ticket-details-info>div:not(.support-ticket-status) {
+        display: none;
+    }
+
+    .support-ticket-attachments-section {
+        order: 1;
+        margin-top: 20px;
+        border-left: 4px solid #2196F3;
+        padding-left: 15px;
+        background-color: #f5f9ff;
+    }
+
+    .support-ticket-comments-section {
+        order: 2;
+    }
+
+    .support-ticket-description-section {
+        order: 3;
+    }
+
+    #support-ticket-details {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .support-ticket-attachments-section h4 {
+        font-size: 16px;
+        color: #2196F3;
+    }
 }

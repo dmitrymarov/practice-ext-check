@@ -123,6 +123,8 @@ $wgDiff3 = "/usr/bin/diff3";
 ## names, e.g. 'vector' or 'monobook':
 $wgDefaultSkin = "vector";
 
+$wgShowExceptionDetails = true;
+
 $wgSupportSystemOpenSearchHost = 'opensearch-node1';
 $wgSupportSystemOpenSearchPort = 9200;
 $wgSupportSystemOpenSearchIndex = 'solutions';
@@ -148,7 +150,6 @@ $wgCirrusSearchServers = [
     ]
 ];
 
-$wgAPIModules['unifiedsearch'] = 'MediaWiki\Extension\SupportSystem\API\ApiUnifiedSearch';
 $wgSupportSystemAIServiceURL = 'http://ai-service:5000';
 
 # Enabled skins.
@@ -172,4 +173,3 @@ wfLoadExtension('Echo');
 wfLoadExtension('PdfHandler');
 wfLoadExtension('TimedMediaHandler');
 wfLoadExtension('VisualEditor');
-$wgShowExceptionDetails = true;

@@ -174,71 +174,73 @@ var selectedSource = '';
      * Поиск с использованием AI
      * @param {string} query Поисковый запрос
      */
-    function searchAI(query) {
-        var api = new mw.Api();
-        searchState.searchQuery = query || searchState.searchQuery || currentSolution;
-        var context = [];
-        dialogHistory.forEach(function (item) {
-            context.push({
-                question: item.nodeId,
-                answer: item.selectedOption
-            });
-        });
-        $('#support-ai-loading').show();
-        $('#support-ai-content').hide();
-        $('#support-ai-container').show();
-        $('#support-solution-container').hide();
-        api.get({
-            action: 'aibridge',
-            query: searchState.searchQuery,
-            context: JSON.stringify(context),
-            format: 'json'
-        }).done(function (data) {
-            searchState.aiSearchDone = true;
-            if (data.ai_result && data.ai_result.success) {
-                $('#support-ai-text').text(data.ai_result.answer);
-                $('#support-ai-loading').hide();
-                $('#support-ai-content').show();
-                if (data.ai_result.sources && data.ai_result.sources.length > 0) {
-                    var sourcesList = $('#support-ai-sources-list');
-                    sourcesList.empty();
-                    data.ai_result.sources.forEach(function (source) {
-                        var li = $('<li>');
-                        if (source.url) {
-                            li.append($('<a>')
-                                .attr('href', source.url)
-                                .attr('target', '_blank')
-                                .text(source.title)
-                            );
-                        } else {li.text(source.title);}
-                        sourcesList.append(li);
-                    });
-                    $('#support-ai-sources').show();
-                } else {$('#support-ai-sources').hide();}
-                $('#support-ai-ticket-button').show();
-            } else {
-                $('#support-ai-text').text(data.ai_result && data.ai_result.answer ||
-                    getMessage('supportsystem-dt-ai-error', 'An error occurred while processing the AI request.'));
-                $('#support-ai-loading').hide();
-                $('#support-ai-content').show();
-                $('#support-ai-sources').hide();
-                $('#support-ai-ticket-button').show();
-            }
-        }).fail(function () {
-            searchState.aiSearchDone = true;
-            $('#support-ai-text').text(getMessage('supportsystem-dt-ai-error', 'An error occurred while processing the AI request.'));
-            $('#support-ai-loading').hide();
-            $('#support-ai-content').show();
-            $('#support-ai-sources').hide();
-            $('#support-ai-ticket-button').show();
-        });
-    }
+    // function searchAI(query) {
+    //     var api = new mw.Api();
+    //     searchState.searchQuery = query || searchState.searchQuery || currentSolution;
+    //     var context = [];
+    //     dialogHistory.forEach(function (item) {
+    //         context.push({
+    //             question: item.nodeId,
+    //             answer: item.selectedOption
+    //         });
+    //     });
+    //     $('#support-ai-loading').show();
+    //     $('#support-ai-content').hide();
+    //     $('#support-ai-container').show();
+    //     $('#support-solution-container').hide();
+    //     api.get({
+    //         action: 'aibridge',
+    //         query: searchState.searchQuery,
+    //         context: JSON.stringify(context),
+    //         format: 'json'
+    //     }).done(function (data) {
+    //         searchState.aiSearchDone = true;
+    //         if (data.ai_result && data.ai_result.success) {
+    //             $('#support-ai-text').text(data.ai_result.answer);
+    //             $('#support-ai-loading').hide();
+    //             $('#support-ai-content').show();
+    //             if (data.ai_result.sources && data.ai_result.sources.length > 0) {
+    //                 var sourcesList = $('#support-ai-sources-list');
+    //                 sourcesList.empty();
+    //                 data.ai_result.sources.forEach(function (source) {
+    //                     var li = $('<li>');
+    //                     if (source.url) {
+    //                         li.append($('<a>')
+    //                             .attr('href', source.url)
+    //                             .attr('target', '_blank')
+    //                             .text(source.title)
+    //                         );
+    //                     } else {li.text(source.title);}
+    //                     sourcesList.append(li);
+    //                 });
+    //                 $('#support-ai-sources').show();
+    //             } else {$('#support-ai-sources').hide();}
+    //             $('#support-ai-ticket-button').show();
+    //         } else {
+    //             $('#support-ai-text').text(data.ai_result && data.ai_result.answer ||
+    //                 getMessage('supportsystem-dt-ai-error', 'An error occurred while processing the AI request.'));
+    //             $('#support-ai-loading').hide();
+    //             $('#support-ai-content').show();
+    //             $('#support-ai-sources').hide();
+    //             $('#support-ai-ticket-button').show();
+    //         }
+    //     }).fail(function () {
+    //         searchState.aiSearchDone = true;
+    //         $('#support-ai-text').text(getMessage('supportsystem-dt-ai-error', 'An error occurred while processing the AI request.'));
+    //         $('#support-ai-loading').hide();
+    //         $('#support-ai-content').show();
+    //         $('#support-ai-sources').hide();
+    //         $('#support-ai-ticket-button').show();
+    //     });
+    // }
+
     function scrollChatToBottom() {
         var container = document.getElementById('support-chat-container');
         if (container) {
             container.scrollTop = container.scrollHeight;
         }
     }
+    
     function initSearchTab() {
         $('#support-search-button').on('click', function () {
             var query = $('#support-search-input').val().trim();
@@ -265,7 +267,6 @@ var selectedSource = '';
      * @param {string} query Поисковый запрос
      */
     function searchSolutions(query) {
-        var useAI = $('#support-search-use-ai').is(':checked');
         $('#support-search-results').html(
             '<div class="support-loading">' +
             '<div class="support-spinner"></div>' +
@@ -276,38 +277,27 @@ var selectedSource = '';
         api.get({
             action: 'unifiedsearch',
             query: query,
-            use_ai: useAI,
-            sources: 'opensearch|mediawiki',
-            context: JSON.stringify(dialogHistory)
+            use_ai: false,
+            sources: 'mediawiki',
+            context: JSON.stringify([])
         }).done(function (data) {
             var results = [];
-            if (data.results && data.results.opensearch) {
-                data.results.opensearch.forEach(function (result) {
+            if (data.results && data.results.cirrus) {
+                data.results.cirrus.forEach(function (result) {
                     results.push(result);
                 });
             }
-            if (data.results && data.results.cirrus) {
-                data.results.cirrus.forEach(function (result) { results.push(result); });
-            }
-            results.sort(function (a, b) { return b.score - a.score;
+            results.sort(function (a, b) {
+                return b.score - a.score;
             });
-
-            if (useAI && data.results && data.results.ai) { displayAIResult(data.results.ai, query); }
-            else if (results.length > 0) { displaySearchResults(results, query); }
-            else {
+            if (results.length > 0) {
+                displaySearchResults(results, query);
+            } else {
                 $('#support-search-results').html(
                     '<div class="support-no-results">' +
                     '<p>' + getMessage('supportsystem-search-noresults', 'Результатов не найдено. Попробуйте изменить запрос.') + '</p>' +
-                    '</div>' +
-                    (useAI ? '' : '<div class="support-try-ai">' +
-                        '<button id="support-search-ai-button" class="support-button-primary">' +
-                        getMessage('supportsystem-search-try-ai', 'Попробуйте AI-поиск') + '</button>' +
-                        '</div>')
+                    '</div>'
                 );
-                $('#support-search-ai-button').on('click', function () {
-                    $('#support-search-use-ai').prop('checked', true);
-                    searchSolutions(query);
-                });
             }
         }).fail(function () {
             $('#support-search-results').html(
@@ -323,39 +313,39 @@ var selectedSource = '';
      * @param {Object} aiResult Результат AI поиска
      * @param {string} query Поисковый запрос
      */
-    function displayAIResult(aiResult, query) {
-        var resultsHtml = '<div class="support-ai-result">';
-        resultsHtml += '<h3>' + (mw.msg('supportsystem-search-ai-result-title') || 'AI-based Answer') + '</h3>';
-        var formattedAnswer = aiResult.answer
-            .replace(/\n/g, '<br>')
-            .replace(/(\d+\. )/g, '<br>$1');
-        resultsHtml += '<div class="support-ai-answer">' + formattedAnswer + '</div>';
-        if (aiResult.sources && aiResult.sources.length > 0) {
-            resultsHtml += '<div class="support-ai-sources">';
-            resultsHtml += '<h4>' + (mw.msg('supportsystem-search-ai-sources') || 'Information Sources') + '</h4>';
-            resultsHtml += '<ul>';
-            aiResult.sources.forEach(function (source) {
-                if (source.url) {
-                    resultsHtml += '<li><a href="' + source.url + '" target="_blank">' + source.title + '</a></li>';
-                } else {
-                    resultsHtml += '<li>' + source.title + '</li>';
-                }
-            });
-            resultsHtml += '</ul></div>';
-        }
-        resultsHtml += '<div class="support-ai-actions">';
-        resultsHtml += '<button class="support-create-ticket-btn support-button-primary" data-solution="' +
-            aiResult.answer.replace(/"/g, '&quot;') + '" data-source="ai">' +
-            (mw.msg('supportsystem-search-create-ticket-ai') || 'Create ticket with this answer') + '</button>';
-        resultsHtml += '</div>';
-        resultsHtml += '</div>';
-        $('#support-search-results').html(resultsHtml);
-        $('.support-create-ticket-btn').on('click', function () {
-            var solution = $(this).data('solution');
-            var source = $(this).data('source');
-            showTicketForm(solution, source);
-        });
-    }
+    // function displayAIResult(aiResult, query) {
+    //     var resultsHtml = '<div class="support-ai-result">';
+    //     resultsHtml += '<h3>' + (mw.msg('supportsystem-search-ai-result-title') || 'AI-based Answer') + '</h3>';
+    //     var formattedAnswer = aiResult.answer
+    //         .replace(/\n/g, '<br>')
+    //         .replace(/(\d+\. )/g, '<br>$1');
+    //     resultsHtml += '<div class="support-ai-answer">' + formattedAnswer + '</div>';
+    //     if (aiResult.sources && aiResult.sources.length > 0) {
+    //         resultsHtml += '<div class="support-ai-sources">';
+    //         resultsHtml += '<h4>' + (mw.msg('supportsystem-search-ai-sources') || 'Information Sources') + '</h4>';
+    //         resultsHtml += '<ul>';
+    //         aiResult.sources.forEach(function (source) {
+    //             if (source.url) {
+    //                 resultsHtml += '<li><a href="' + source.url + '" target="_blank">' + source.title + '</a></li>';
+    //             } else {
+    //                 resultsHtml += '<li>' + source.title + '</li>';
+    //             }
+    //         });
+    //         resultsHtml += '</ul></div>';
+    //     }
+    //     resultsHtml += '<div class="support-ai-actions">';
+    //     resultsHtml += '<button class="support-create-ticket-btn support-button-primary" data-solution="' +
+    //         aiResult.answer.replace(/"/g, '&quot;') + '" data-source="ai">' +
+    //         (mw.msg('supportsystem-search-create-ticket-ai') || 'Create ticket with this answer') + '</button>';
+    //     resultsHtml += '</div>';
+    //     resultsHtml += '</div>';
+    //     $('#support-search-results').html(resultsHtml);
+    //     $('.support-create-ticket-btn').on('click', function () {
+    //         var solution = $(this).data('solution');
+    //         var source = $(this).data('source');
+    //         showTicketForm(solution, source);
+    //     });
+    // }
 
     /**
      * Отображение результатов обычного поиска
@@ -825,35 +815,45 @@ var selectedSource = '';
                     else { showTicketSuccess(response.ticket.id); }
                 } else {
                     console.error('Ошибка создания тикета:', response);
-                    mw.notify(getMessage('supportsystem-search-ticket-error', 'Ошибка создания тикета'),
-                        { type: 'error' });
+                    $('#support-ticket-form').hide();
+                    loadTickets();
+                    showPanel('tickets');
+                    mw.notify('Проверяем, была ли создана заявка...', { type: 'info' });
                     $('#support-ticket-submit').prop('disabled', false);
                     $('#support-ticket-submit').text(getMessage('supportsystem-dt-submit', 'Отправить'));
                 }
             } catch (e) {
                 console.error('Ошибка обработки ответа:', e);
-                mw.notify(getMessage('supportsystem-search-ticket-error', 'Ошибка создания тикета'),
-                    { type: 'error' });
+                $('#support-ticket-form').hide();
+                loadTickets();
+                showPanel('tickets');
+                mw.notify('Проверяем, была ли создана заявка...', { type: 'info' });
                 $('#support-ticket-submit').prop('disabled', false);
                 $('#support-ticket-submit').text(getMessage('supportsystem-dt-submit', 'Отправить'));
             }
+
             setTimeout(function () {
                 document.body.removeChild(form);
                 document.body.removeChild(iframe);
             }, 100);
         };
         iframe.onerror = function () {
-            mw.notify(getMessage('supportsystem-search-ticket-error', 'Ошибка создания тикета'),
-                { type: 'error' });
+            $('#support-ticket-form').hide();
+            loadTickets();
+            showPanel('tickets');
+            mw.notify('Проверяем, была ли создана заявка...', { type: 'info' });
             $('#support-ticket-submit').prop('disabled', false);
             $('#support-ticket-submit').text(getMessage('supportsystem-dt-submit', 'Отправить'));
+
             setTimeout(function () {
                 document.body.removeChild(form);
                 document.body.removeChild(iframe);
             }, 100);
         };
+
         form.submit();
     }
+
     /**
      * Прикрепление решения к заявке
      * @param {number} ticketId ID заявки
@@ -902,16 +902,20 @@ var selectedSource = '';
                 $('#support-comment-text').val('');
                 viewTicket(ticketId);
             } else {
-                mw.notify(mw.msg('supportsystem-sd-ticket-comment-error') || 'Ошибка добавления комментария',
-                    { type: 'error' });
+                mw.notify('Проверяем статус добавления комментария...', { type: 'info' });
+                setTimeout(function () {
+                    viewTicket(ticketId);
+                }, 1000);
             }
         }).fail(function () {
-            mw.notify(mw.msg('supportsystem-sd-ticket-comment-error') || 'Ошибка добавления комментария',
-                { type: 'error' });
-        }).always(function () {
-            $('#support-comment-submit').prop('disabled', false);
+            mw.notify('Проверяем, был ли добавлен комментарий...', { type: 'info' });
+            setTimeout(function () {
+                viewTicket(ticketId);
+                $('#support-comment-submit').prop('disabled', false);
+            }, 1000);
         });
     }
+
     /**
      * Функция для инициализации загрузки файлов
      */
