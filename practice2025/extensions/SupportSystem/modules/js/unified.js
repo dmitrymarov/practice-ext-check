@@ -169,6 +169,7 @@ var selectedSource = '';
                 mw.notify(messages.search_empty || 'Please enter a search query', { type: 'error' });
             }
         });
+
         $('#support-search-input').on('keypress', function (e) {
             if (e.which === 13) {
                 var query = $(this).val().trim();
@@ -179,6 +180,36 @@ var selectedSource = '';
                 }
             }
         });
+
+        // Добавляем примеры запросов
+        var searchExamples = [
+            "Не работает docker что делать?",
+            "Как настроить MediaWiki",
+            "Проблемы с OpenSearch",
+            "Docker установка"
+        ];
+
+        var examplesHtml = '<div class="support-search-examples">' +
+            '<p>Примеры запросов:</p>' +
+            '<ul class="support-example-list">';
+
+        searchExamples.forEach(function (example) {
+            examplesHtml += '<li><a href="#" class="support-example-query">' + example + '</a></li>';
+        });
+
+        examplesHtml += '</ul></div>';
+
+        // Добавляем примеры запросов под полем поиска
+        $('.support-search-box').after(examplesHtml);
+
+        // Обработчик клика по примеру запроса
+        $('.support-example-query').on('click', function (e) {
+            e.preventDefault();
+            var query = $(this).text();
+            $('#support-search-input').val(query);
+            searchSolutions(query);
+        });
+
     }
 
     /**
@@ -192,60 +223,119 @@ var selectedSource = '';
             '<p>' + (mw.msg('supportsystem-search-loading') || 'Поиск...') + '</p>' +
             '</div>'
         );
+
         console.log('Выполняется поиск:', query);
-        var api = new mw.Api();
+
+        // Используем обработку ошибок и таймауты для более надежного поиска
+        var api = new mw.Api({
+            ajax: {
+                timeout: 30000, // 30 секунд таймаут
+                headers: {
+                    'Cache-Control': 'no-cache'
+                }
+            }
+        });
+
         api.get({
             action: 'unifiedsearch',
             query: query,
             sources: 'opensearch|mediawiki',
-            limit: 10
-        }).done(function (data) {
-            console.log('Результаты поиска:', data);
-            var results = [];
-            if (data.error) {
-                console.error('Ошибка поиска:', data.error);
-                $('#support-search-results').html(
-                    '<div class="support-error">' +
-                    '<p>' + (mw.msg('supportsystem-search-error') || 'Произошла ошибка при поиске. Пожалуйста, попробуйте позже.') + '</p>' +
-                    '</div>'
-                );
-                return;
-            }
-            if (data.results) {
+            limit: 10,
+            format: 'json'
+        })
+            .done(function (data) {
+                console.log('Результаты поиска:', data);
+
+                if (!data || !data.results) {
+                    console.error('Неверный формат ответа:', data);
+                    showSearchError('Получен неверный формат ответа от сервера');
+                    return;
+                }
+
+                var results = [];
+
+                // Обработка результатов из OpenSearch
                 if (data.results.opensearch && Array.isArray(data.results.opensearch)) {
                     data.results.opensearch.forEach(function (item) {
-                        if (item) results.push(item);
+                        if (item) {
+                            item.source = 'opensearch';
+                            results.push(item);
+                        }
                     });
                 }
+
+                // Обработка результатов из MediaWiki
                 if (data.results.mediawiki && Array.isArray(data.results.mediawiki)) {
                     data.results.mediawiki.forEach(function (item) {
-                        if (item) results.push(item);
+                        if (item) {
+                            item.source = 'mediawiki';
+                            results.push(item);
+                        }
                     });
                 }
-            }
-            results.sort(function (a, b) {
-                var scoreA = typeof a.score === 'number' ? a.score : 0;
-                var scoreB = typeof b.score === 'number' ? b.score : 0;
-                return scoreB - scoreA;
+
+                // Сортировка результатов по релевантности
+                results.sort(function (a, b) {
+                    var scoreA = typeof a.score === 'number' ? a.score : 0;
+                    var scoreB = typeof b.score === 'number' ? b.score : 0;
+                    return scoreB - scoreA;
+                });
+
+                if (results.length > 0) {
+                    displaySearchResults(results, query);
+                } else {
+                    $('#support-search-results').html(
+                        '<div class="support-no-results">' +
+                        '<p>' + (mw.msg('supportsystem-search-noresults') || 'Результатов не найдено. Попробуйте изменить запрос.') + '</p>' +
+                        '<p><button id="support-try-different-search" class="support-button-secondary">Попробовать другой запрос</button></p>' +
+                        '</div>'
+                    );
+
+                    $('#support-try-different-search').on('click', function () {
+                        $('#support-search-input').val('').focus();
+                    });
+                }
+            })
+            .fail(function (error, details) {
+                console.error('API error:', error, details);
+
+                var errorMessage = 'Произошла ошибка при поиске. Пожалуйста, попробуйте позже.';
+
+                // Пытаемся извлечь детали ошибки
+                if (error && error.error && error.error.info) {
+                    errorMessage = 'Ошибка поиска: ' + error.error.info;
+                } else if (error && error.textStatus) {
+                    if (error.textStatus === 'timeout') {
+                        errorMessage = 'Время ожидания ответа от сервера истекло. Пожалуйста, попробуйте позже.';
+                    } else {
+                        errorMessage = 'Ошибка соединения: ' + error.textStatus;
+                    }
+                }
+
+                showSearchError(errorMessage);
             });
+    }
 
-            if (results.length > 0) {
-                displaySearchResults(results, query);
+    /**
+ * Отображает сообщение об ошибке поиска
+ * @param {string} message Сообщение об ошибке
+ */
+    function showSearchError(message) {
+        $('#support-search-results').html(
+            '<div class="support-error">' +
+            '<p>' + (mw.msg('supportsystem-search-error') || 'Произошла ошибка при поиске. Пожалуйста, попробуйте позже.') + '</p>' +
+            '<p class="support-error-details">Детали ошибки: <span>' + message + '</span></p>' +
+            '<p><button id="support-try-different-search" class="support-button-primary">Попробовать снова</button></p>' +
+            '</div>'
+        );
+
+        $('#support-try-different-search').on('click', function () {
+            var query = $('#support-search-input').val().trim();
+            if (query) {
+                searchSolutions(query);
             } else {
-                $('#support-search-results').html(
-                    '<div class="support-no-results">' +
-                    '<p>' + (mw.msg('supportsystem-search-noresults') || 'Результатов не найдено. Попробуйте изменить запрос.') + '</p>' +
-                    '</div>'
-                );
+                $('#support-search-input').focus();
             }
-        }).fail(function (error) {
-            console.error('API error:', error);
-
-            $('#support-search-results').html(
-                '<div class="support-error">' +
-                '<p>' + (mw.msg('supportsystem-search-error') || 'Произошла ошибка при поиске. Пожалуйста, попробуйте позже.') + '</p>' +
-                '</div>'
-            );
         });
     }
 
@@ -257,6 +347,7 @@ var selectedSource = '';
     function displaySearchResults(results, query) {
         var resultsHtml = '';
         resultsHtml += '<h3>' + (mw.msg('supportsystem-search-results-count', results.length) || 'Найдено решений: ' + results.length) + '</h3>';
+        resultsHtml += '<p>По запросу: <strong>' + query + '</strong></p>';
 
         results.forEach(function (result) {
             // Безопасно получаем значения
@@ -276,46 +367,161 @@ var selectedSource = '';
                 }
             }
 
-            // Безопасно экранируем содержимое для HTML
-            var safeTitle = $('<div>').text(resultTitle).html();
+            // Выделяем слова запроса в результатах, если они не выделены
+            if (resultContent && !/<strong>/i.test(resultContent)) {
+                // Разбиваем запрос на термины
+                var terms = query.split(/\s+/).filter(function (term) {
+                    // Игнорируем короткие слова и стоп-слова
+                    return term.length > 2 && !/^(как|что|где|кто|почему|зачем|когда|не|и|в|на|с|по|к|у|о|от|для|до|при)$/i.test(term);
+                });
 
-            // Безопасно экранируем содержимое для атрибута data-
-            var solutionForData = '';
-            if (result.content) {
-                solutionForData = result.content.replace(/"/g, '&quot;');
-                if (solutionForData.length > 1000) {
-                    solutionForData = solutionForData.substring(0, 1000);
-                }
+                // Выделяем каждый термин в контенте
+                terms.forEach(function (term) {
+                    // Создаем регулярное выражение для поиска слова с учетом регистра и словоформ
+                    var regex = new RegExp('(' + escapeRegExp(term) + '[а-яё]*)', 'gi');
+                    resultContent = resultContent.replace(regex, '<strong>$1</strong>');
+                });
             }
+
+            // Проверяем, есть ли у результата URL
+            var hasUrl = result.url && result.url.length > 0;
 
             // Форматирование результата поиска
             resultsHtml +=
                 '<div class="support-result-card">' +
                 '<div class="support-result-header">' +
-                '<h4>' + safeTitle + '</h4>' +
+                '<h4>' + resultTitle + '</h4>' +
                 '<div class="support-result-meta">' +
                 '<span class="support-badge ' + badgeClass + '">' + sourceLabel + '</span>' +
+                (result.score ? '<span class="support-score-badge">Релевантность: ' + result.score.toFixed(2) + '</span>' : '') +
                 '</div>' +
                 '</div>' +
                 '<div class="support-result-body">' +
                 '<div class="support-result-content">' + resultContent + '</div>' +
+                (result.tags && result.tags.length ? '<div class="support-result-tags">' + formatTags(result.tags) + '</div>' : '') +
                 '<div class="support-result-actions">' +
-                (result.url ? '<a href="' + result.url + '" target="_blank" class="support-source-link support-button-secondary">' +
+                (hasUrl ? '<a href="' + result.url + '" target="_blank" class="support-button-secondary">' +
                     (mw.msg('supportsystem-search-source-link') || 'Перейти к источнику') + '</a>' : '') +
-                '<button class="support-create-ticket-btn support-button-primary" data-solution="' + solutionForData + '" data-source="' + source + '">' +
+                '<button class="support-create-ticket-btn support-button-primary" data-solution="' + escapeAttr(result.content || '') + '" data-source="' + source + '">' +
                 (mw.msg('supportsystem-search-create-ticket') || 'Создать заявку с этим решением') + '</button>' +
                 '</div>' +
                 '</div>' +
                 '</div>';
         });
 
+        // Добавляем кнопку для нового поиска
+        resultsHtml += '<div class="support-search-actions">' +
+            '<button id="support-new-search" class="support-button-secondary">Новый поиск</button>' +
+            '</div>';
+
         $('#support-search-results').html(resultsHtml);
 
+        // Привязываем обработчики событий
         $('.support-create-ticket-btn').on('click', function () {
             var solution = $(this).data('solution');
             var source = $(this).data('source');
             showTicketForm(solution, source);
         });
+
+        $('#support-new-search').on('click', function () {
+            $('#support-search-input').val('').focus();
+        });
+    }
+
+    /**
+ * Форматирует теги для отображения
+ * @param {Array|string} tags Теги
+ * @return {string} HTML с тегами
+ */
+    function formatTags(tags) {
+        if (!tags) return '';
+
+        // Преобразуем строку в массив, если это строка
+        if (typeof tags === 'string') {
+            tags = tags.split(/,\s*/);
+        }
+
+        var html = '';
+        if (Array.isArray(tags)) {
+            tags.forEach(function (tag) {
+                html += '<span class="support-tag">' + tag + '</span>';
+            });
+        }
+        return html;
+    }
+
+    /**
+     * Экранирует строку для безопасного использования в атрибутах data-
+     * @param {string} str Строка для экранирования
+     * @return {string} Экранированная строка
+     */
+    function escapeAttr(str) {
+        if (!str) return '';
+        return str.replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    /**
+     * Экранирование символов регулярных выражений
+     * @param {string} str Строка для экранирования
+     * @return {string} Экранированная строка
+     */
+    function escapeRegExp(str) {
+        return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    function isNaturalLanguageQuery(query) {
+        // Проверяем наличие вопросительных слов или знаков
+        var questionWords = ['что', 'как', 'почему', 'где', 'когда', 'кто', 'зачем'];
+        var hasQuestionMark = query.indexOf('?') !== -1;
+
+        for (var i = 0; i < questionWords.length; i++) {
+            if (query.toLowerCase().indexOf(questionWords[i] + ' ') !== -1) {
+                return true;
+            }
+        }
+
+        // Проверяем фразы типа "не работает X"
+        if (/не\s+работает/i.test(query)) {
+            return true;
+        }
+
+        return hasQuestionMark;
+    }
+
+    /**
+     * Добавляет наводящий текст, если в исходном запросе нет результатов
+     * @param {string} query Исходный запрос
+     * @return {string} Запрос с добавленными ключевыми словами
+     */
+    function addHelpfulKeywords(query) {
+        var originalQuery = query;
+
+        // Удаляем вопросительные знаки
+        query = query.replace(/\?/g, '');
+
+        // Если в запросе есть слово "docker"
+        if (/docker/i.test(query)) {
+            if (!/ошибка|проблема|установка|настройка/i.test(query)) {
+                return query + ' проблема ошибка настройка установка';
+            }
+        }
+
+        // Если в запросе есть слова "не работает"
+        if (/не\s+работает/i.test(query)) {
+            var match = query.match(/не\s+работает\s+([^\s,.?!]+)/i);
+            if (match && match[1]) {
+                var subject = match[1];
+                return query + ' ' + subject + ' проблема ошибка решение';
+            }
+            return query + ' проблема ошибка решение';
+        }
+
+        // Если запрос - вопрос
+        if (isNaturalLanguageQuery(originalQuery)) {
+            return query + ' инструкция руководство помощь';
+        }
+
+        return query;
     }
 
     /**
