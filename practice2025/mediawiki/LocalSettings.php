@@ -132,7 +132,7 @@ wfLoadSkin( 'Timeless' );
 wfLoadSkin( 'Vector' );
 
 $wgShowExceptionDetails = true;
-$wgSupportSystemRedmineAPIKey = 'a02d08a61c2ff8f7484f9f999a07b989d9d724c0';
+$wgSupportSystemRedmineAPIKey = '84a82c13bc045473b38f31835bfe17cee7bf9c0d';
 $wgSupportSystemRedmineURL = getenv('REDMINE_URL') ?: 'http://redmine:3000';
 $wgSupportSystemGraphDataFile = '/var/www/html/extensions/SupportSystem/data/graph_data.json';
 

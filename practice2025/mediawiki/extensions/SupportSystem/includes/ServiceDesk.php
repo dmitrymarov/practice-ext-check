@@ -31,7 +31,7 @@ class ServiceDesk
      * 
      * @param string $subject Ticket subject
      * @param string $description Ticket description
-     * @param string $priority Ticket priority ('red', 'orange', 'yellow', 'green')
+     * @param string $priority Ticket priority ('critical', 'high', 'normal', 'low')
      * @param int|null $assignedTo User ID to assign the ticket to
      * @param int $projectId Project ID
      * @param array $attachments Array of attachment tokens from uploadFile
@@ -41,7 +41,7 @@ class ServiceDesk
     public function createTicket(
         string $subject,
         string $description,
-        string $priority = 'yellow',
+        string $priority = 'normal',
         int $assignedTo = null,
         int $projectId = 1,
         array $attachments = []
@@ -57,8 +57,12 @@ class ServiceDesk
                 'status_id' => 1
             ]
         ];
-        if ($assignedTo) { $issueData['issue']['assigned_to_id'] = $assignedTo; }
-        if (!empty($attachments)) { $issueData['issue']['uploads'] = $attachments; }
+        if ($assignedTo) {
+            $issueData['issue']['assigned_to_id'] = $assignedTo;
+        }
+        if (!empty($attachments)) {
+            $issueData['issue']['uploads'] = $attachments;
+        }
         $url = rtrim($this->apiUrl, '/') . "/issues.json";
         $jsonData = json_encode($issueData);
         $command = "curl -s -X POST " .
@@ -85,14 +89,48 @@ class ServiceDesk
      */
     private function getPriorityId(string $priorityName): int
     {
+        // Updated mapping for semantic priority names
         $priorities = [
-            'red' => 1,     // High
-            'orange' => 2,  // Urgent
-            'yellow' => 3,  // Normal
-            'green' => 4    // Low
+            'critical' => 5,    // Critical/Immediate priority
+            'high' => 4,        // High priority
+            'normal' => 3,      // Normal priority (default)
+            'low' => 2,         // Low priority
+
+            // Legacy support for color-based naming (for backward compatibility)
+            'red' => 5,         // Critical (was High)
+            'orange' => 4,      // High (was Urgent)
+            'yellow' => 3,      // Normal
+            'green' => 2        // Low
         ];
         $priorityName = strtolower($priorityName);
-        return $priorities[$priorityName] ?? 3;
+        return $priorities[$priorityName] ?? 3; // Default to Normal
+    }
+
+    /**
+     * Get priority name from Redmine priority object
+     * 
+     * @param array|object $priority Priority data from Redmine
+     * @return string Normalized priority name
+     */
+    public function normalizePriorityName($priority): string
+    {
+        if (is_array($priority) && isset($priority['id'])) {
+            $priorityId = $priority['id'];
+        } elseif (is_object($priority) && isset($priority->id)) {
+            $priorityId = $priority->id;
+        } else {
+            return 'normal';
+        }
+
+        $priorityMap = [
+            5 => 'critical',
+            4 => 'high',
+            3 => 'normal',
+            2 => 'low',
+            1 => 'low'  // Fallback for very low priority
+        ];
+
+        return $priorityMap[$priorityId] ?? 'normal';
     }
 
     /**
@@ -108,7 +146,9 @@ class ServiceDesk
         if (!file_exists($filePath)) {
             throw new MWException("Файл не найден: $filePath");
         }
-        if (empty($fileName)) { $fileName = basename($filePath); }
+        if (empty($fileName)) {
+            $fileName = basename($filePath);
+        }
         $finfo = new \finfo(FILEINFO_MIME_TYPE);
         $contentType = $finfo->file($filePath);
         $url = rtrim($this->apiUrl, '/') . "/uploads.json";
@@ -142,7 +182,9 @@ class ServiceDesk
      */
     public function attachFilesToTicket(int $ticketId, array $attachments, string $comment = ''): bool
     {
-        if (empty($attachments)) { return false; }
+        if (empty($attachments)) {
+            return false;
+        }
         $issueData = [
             'issue' => [
                 'notes' => $comment ?: 'Файлы прикреплены к заявке',
@@ -157,7 +199,9 @@ class ServiceDesk
             "-d " . escapeshellarg($jsonData) . " " .
             "\"$url\"";
         $response = shell_exec($command);
-        if (empty($response)) { return true; }
+        if (empty($response)) {
+            return true;
+        }
         $data = json_decode($response, true);
         if (isset($data['errors'])) {
             throw new MWException("Failed to attach files: " . implode(", ", $data['errors']));
@@ -203,7 +247,9 @@ class ServiceDesk
                 "-d " . escapeshellarg($jsonData) . " \"$url\"";
             shell_exec($command);
             return true;
-        } catch (MWException $e) { throw $e; }
+        } catch (MWException $e) {
+            throw $e;
+        }
     }
 
     /**
@@ -217,9 +263,17 @@ class ServiceDesk
         $url = rtrim($this->apiUrl, '/') . "/issues/{$ticketId}.json?include=journals,attachments";
         $command = "curl -s -H \"X-Redmine-API-Key: {$this->apiKey}\" \"$url\"";
         $response = shell_exec($command);
-        if (!$response) { return null; }
+        if (!$response) {
+            return null;
+        }
         $data = json_decode($response, true);
-        if (!isset($data['issue'])) { return null; }
+        if (!isset($data['issue'])) {
+            return null;
+        }
+        if (isset($data['issue']['priority'])) {
+            $data['issue']['priority']['normalized_name'] = $this->normalizePriorityName($data['issue']['priority']);
+        }
+
         return $data['issue'];
     }
 
@@ -232,7 +286,8 @@ class ServiceDesk
      */
     public function addComment(int $ticketId, string $comment): bool
     {
-        $issueData = ['issue' => [ 'notes' => $comment ]
+        $issueData = [
+            'issue' => ['notes' => $comment]
         ];
         $url = rtrim($this->apiUrl, '/') . "/issues/{$ticketId}.json";
         $jsonData = json_encode($issueData);
@@ -254,9 +309,18 @@ class ServiceDesk
         $url = rtrim($this->apiUrl, '/') . "/issues.json?limit=$limit&offset=$offset";
         $command = "curl -s -H \"X-Redmine-API-Key: {$this->apiKey}\" \"$url\"";
         $response = shell_exec($command);
-        if (!$response) { return []; }
+        if (!$response) {
+            return [];
+        }
         $data = json_decode($response, true);
-        if (!isset($data['issues'])) { return []; }
+        if (!isset($data['issues'])) {
+            return [];
+        }
+        foreach ($data['issues'] as &$issue) {
+            if (isset($issue['priority'])) {
+                $issue['priority']['normalized_name'] = $this->normalizePriorityName($issue['priority']);
+            }
+        }
         return $data['issues'];
     }
     /**
@@ -300,7 +364,7 @@ class ServiceDesk
         }
         return $uploadInfos;
     }
-    
+
     /**
      * Attach a solution to a ticket
      * 
@@ -312,7 +376,9 @@ class ServiceDesk
     public function attachSolution(int $ticketId, string $solution, string $source = 'unknown'): bool
     {
         try {
-            if (empty($solution)) { return false; }
+            if (empty($solution)) {
+                return false;
+            }
             $comment = "Решение из источника: $source\n\n" . substr($solution, 0, 30000);
             $issueData = [
                 'issue' => [
@@ -327,7 +393,9 @@ class ServiceDesk
                 "-d " . escapeshellarg($jsonData) . " " .
                 "\"$url\"";
             $response = shell_exec($command);
-            if (empty($response)) { return true; }
+            if (empty($response)) {
+                return true;
+            }
             $data = json_decode($response, true);
             if (isset($data['errors'])) {
                 wfDebugLog('supportSystem', 'Error attaching solution: ' . implode(', ', $data['errors']));

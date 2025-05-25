@@ -1,0 +1,6 @@
+production:
+  rest_api_enabled: true
+  jsonp_enabled: true
+  cross_project_issue_relations: true
+  app_title: "Support System - Redmine"
+  welcome_text: "Welcome to the Support System. This Redmine instance is integrated with MediaWiki."

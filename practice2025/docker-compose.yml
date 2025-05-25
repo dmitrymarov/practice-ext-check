@@ -9,9 +9,10 @@ services:
     ports:
       - "8080:80"
     volumes:
-      - ./extensions:/var/www/html/extensions
-      - ./scripts/:/var/www/html/scripts
-      - ./LocalSettings.php:/var/www/html/LocalSettings.php
+      - ./mediawiki/extensions:/var/www/html/extensions
+      - ./mediawiki/scripts/:/var/www/html/scripts
+      - ./mediawiki/LocalSettings.php:/var/www/html/LocalSettings.php
+      - ./mediawiki/composer.local.json:/var/www/html/composer.local.json
     command: >
       bash -lc "
         apt-get update && \
@@ -113,7 +114,9 @@ services:
       - support_net
 
   redmine:
-    image: redmine:5.0
+    build:
+      context: ./redmine
+      dockerfile: Dockerfile
     container_name: support-redmine
     restart: unless-stopped
     ports:
@@ -121,6 +124,8 @@ services:
     volumes:
       - redmine_data:/usr/src/redmine/files
       - redmine_plugins:/usr/src/redmine/plugins
+      - ./redmine/config:/usr/src/redmine/config/docker
+      - ./redmine/init:/docker-entrypoint-init.d
     environment:
       - REDMINE_DB_POSTGRES=postgres-redmine
       - REDMINE_DB_DATABASE=redmine
@@ -128,6 +133,7 @@ services:
       - REDMINE_DB_PASSWORD=redmine
       - RAILS_ENV=production
       - SECRET_KEY_BASE=someveryverylongsecretkey123456789012345678901234567890
+      - REDMINE_PLUGINS_MIGRATE=true
     depends_on:
       - postgres-redmine
     networks:
