@@ -1,50 +1,52 @@
 services:
-  # MediaWiki service
   mediawiki:
     image: mediawiki:1.39
     container_name: support-mediawiki
     restart: unless-stopped
     depends_on:
-      - database
+      - postgres-mediawiki
       - opensearch-node1
     ports:
       - "8080:80"
     volumes:
-      - mediawiki_data:/var/www/html/images
       - ./extensions:/var/www/html/extensions
-      - ./LocalSettings.php:/var/www/html/LocalSettings.php
       - ./scripts/:/var/www/html/scripts
+      - ./LocalSettings.php:/var/www/html/LocalSettings.php
+    command: >
+      bash -lc "
+        apt-get update && \
+        apt-get install -y libpq-dev p7zip-full unzip && \
+        docker-php-ext-install mysqli pdo pdo_mysql pgsql pdo_pgsql && \
+        curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/bin --filename=composer && \
+        exec apache2-foreground
+      "
     environment:
-      - MEDIAWIKI_DB_HOST=database
-      - MEDIAWIKI_DB_PORT=3306
+      - MEDIAWIKI_DB_TYPE=postgres
+      - MEDIAWIKI_DB_HOST=postgres-mediawiki
+      - MEDIAWIKI_DB_PORT=5432
       - MEDIAWIKI_DB_NAME=mediawiki
       - MEDIAWIKI_DB_USER=wikiuser
       - MEDIAWIKI_DB_PASSWORD=wikipass
       - MEDIAWIKI_ADMIN_USER=admin
       - MEDIAWIKI_ADMIN_PASS=adminpass
-      - MEDIAWIKI_SITE_NAME=Support Knowledge Base
+      - MEDIAWIKI_SITE_NAME=KnowledgeBase
       - REDMINE_URL=http://redmine:3000
-      - AI_SERVICE_URL=http://ai-service:5000
-      - OPENSEARCH_URL=http://opensearch-node1:9200
     networks:
       - support_net
 
-  # Database for MediaWiki
-  database:
-    image: mariadb:10.6
-    container_name: support-database
+  postgres-mediawiki:
+    image: postgres:15-alpine
+    container_name: support-postgres-mediawiki
     restart: unless-stopped
     volumes:
-      - db_data:/var/lib/mysql
+      - postgres_mediawiki_data:/var/lib/postgresql/data
     environment:
-      - MYSQL_ROOT_PASSWORD=rootpass
-      - MYSQL_DATABASE=mediawiki
-      - MYSQL_USER=wikiuser
-      - MYSQL_PASSWORD=wikipass
+      - POSTGRES_DB=mediawiki
+      - POSTGRES_USER=wikiuser
+      - POSTGRES_PASSWORD=wikipass
     networks:
       - support_net
 
-  # OpenSearch for full-text search
   opensearch-node1:
     image: opensearchproject/opensearch:latest
     container_name: support-opensearch1
@@ -110,7 +112,6 @@ services:
     networks:
       - support_net
 
-  # Redmine for ticket management
   redmine:
     image: redmine:5.0
     container_name: support-redmine
@@ -121,49 +122,27 @@ services:
       - redmine_data:/usr/src/redmine/files
       - redmine_plugins:/usr/src/redmine/plugins
     environment:
-      - REDMINE_DB_MYSQL=support-redmine-db
+      - REDMINE_DB_POSTGRES=postgres-redmine
       - REDMINE_DB_DATABASE=redmine
       - REDMINE_DB_USERNAME=redmine
       - REDMINE_DB_PASSWORD=redmine
       - RAILS_ENV=production
       - SECRET_KEY_BASE=someveryverylongsecretkey123456789012345678901234567890
     depends_on:
-      - redmine-db
+      - postgres-redmine
     networks:
       - support_net
 
-  # Database for Redmine
-  redmine-db:
-    image: mariadb:10.6
-    container_name: support-redmine-db
+  postgres-redmine:
+    image: postgres:15-alpine
+    container_name: support-postgres-redmine
     restart: unless-stopped
     volumes:
-      - redmine_db_data:/var/lib/mysql
+      - postgres_redmine_data:/var/lib/postgresql/data
     environment:
-      - MYSQL_ROOT_PASSWORD=rootpass
-      - MYSQL_DATABASE=redmine
-      - MYSQL_USER=redmine
-      - MYSQL_PASSWORD=redmine
-    networks:
-      - support_net
-
-  ai-service:
-    build:
-      context: ./ai-service
-      dockerfile: Dockerfile
-    container_name: support-ai-service
-    restart: unless-stopped
-    volumes:
-      - ./ai-service:/app
-      - ai_service_data:/app/data
-    ports:
-      - "5000:5000"
-    environment:
-      - MEDIAWIKI_URL=http://mediawiki/api.php
-      - REDMINE_URL=http://redmine:3000
-      - REDMINE_API_KEY=e0d62b7b9695048dd4a4d44bbc9f074c865fcf2f
-      - STORAGE_PATH=/app/data
-      - CORS_ORIGINS=*
+      - POSTGRES_DB=redmine
+      - POSTGRES_USER=redmine
+      - POSTGRES_PASSWORD=redmine
     networks:
       - support_net
 
@@ -173,10 +152,9 @@ networks:
 
 volumes:
   mediawiki_data:
-  db_data:
+  postgres_mediawiki_data:
+  postgres_redmine_data:
   opensearch_data1:
   opensearch_data2:
   redmine_data:
   redmine_plugins:
-  redmine_db_data:
-  ai_service_data:

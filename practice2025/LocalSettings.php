@@ -11,15 +11,15 @@
 # https://www.mediawiki.org/wiki/Manual:Configuration_settings
 
 # Protect against web entry
-if (!defined('MEDIAWIKI')) {
-    exit;
+if ( !defined( 'MEDIAWIKI' ) ) {
+	exit;
 }
 
 
 ## Uncomment this to disable output compression
 # $wgDisableOutputCompression = true;
 
-$wgSitename = "SupportKnowledgeBase";
+$wgSitename = "KnowledgeBase";
 
 ## The URL base path to the directory containing the wiki;
 ## defaults for all runtime URL paths are based off of this.
@@ -37,8 +37,8 @@ $wgResourceBasePath = $wgScriptPath;
 ## The URL paths to the logo.  Make sure you change this from the default,
 ## or else you'll overwrite your logo when you upgrade!
 $wgLogos = [
-    '1x' => "$wgResourceBasePath/resources/assets/change-your-logo.svg",
-    'icon' => "$wgResourceBasePath/resources/assets/change-your-logo.svg",
+	'1x' => "$wgResourceBasePath/resources/assets/change-your-logo.svg",
+	'icon' => "$wgResourceBasePath/resources/assets/change-your-logo.svg",
 ];
 
 ## UPO means: this is also a user preference option
@@ -49,22 +49,20 @@ $wgEnableUserEmail = true; # UPO
 $wgEmergencyContact = "";
 $wgPasswordSender = "";
 
-$wgEnotifUserTalk = false; # UPO
+$wgEnotifUserTalk = true; # UPO
 $wgEnotifWatchlist = false; # UPO
 $wgEmailAuthentication = true;
 
 ## Database settings
-$wgDBtype = "mysql";
-$wgDBserver = "database";
+$wgDBtype = "postgres";
+$wgDBserver = "postgres-mediawiki";
 $wgDBname = "mediawiki";
 $wgDBuser = "wikiuser";
 $wgDBpassword = "wikipass";
 
-# MySQL specific settings
-$wgDBprefix = "";
-
-# MySQL table options to use during installation or update
-$wgDBTableOptions = "ENGINE=InnoDB, DEFAULT CHARSET=binary";
+# Postgres specific settings
+$wgDBport = "5432";
+$wgDBmwschema = "mediawiki";
 
 # Shared database table
 # This has no effect unless $wgSharedDB is also set.
@@ -99,77 +97,171 @@ $wgLocaltimezone = "UTC";
 ## be publicly accessible from the web.
 #$wgCacheDirectory = "$IP/cache";
 
-$wgSecretKey = "3b3404e62984d1f87ac1ec2562e309ddf2410b1b92405570a320a822ed5f3ac0";
+$wgSecretKey = "72fd534676b218bebaa17da1ae5c825d8a0ffbabebb5a6b534516ac7843a102f";
 
 # Changing this will log out all existing sessions.
 $wgAuthenticationTokenVersion = "1";
 
 # Site upgrade key. Must be set to a string (default provided) to turn on the
 # web installer while LocalSettings.php is in place
-$wgUpgradeKey = "268cae80c62cbc48";
+$wgUpgradeKey = "a68daef5124c869f";
 
 ## For attaching licensing metadata to pages, and displaying an
 ## appropriate copyright notice / icon. GNU Free Documentation
 ## License and Creative Commons licenses are supported so far.
 $wgRightsPage = ""; # Set to the title of a wiki page that describes your license/copyright
-$wgRightsUrl = "";
-$wgRightsText = "";
-$wgRightsIcon = "";
+$wgRightsUrl = "https://www.gnu.org/copyleft/fdl.html";
+$wgRightsText = "GNU Free Documentation License 1.3 or later";
+$wgRightsIcon = "$wgResourceBasePath/resources/assets/licenses/gnu-fdl.png";
 
 # Path to the GNU diff3 utility. Used for conflict resolution.
 $wgDiff3 = "/usr/bin/diff3";
 
+# The following permissions were set based on your choice in the installer
+$wgGroupPermissions["*"]["edit"] = false;
+
 ## Default skin: you can change the default skin. Use the internal symbolic
 ## names, e.g. 'vector' or 'monobook':
-$wgDefaultSkin = "vector";
-
-$wgShowExceptionDetails = true;
-
-$wgSupportSystemOpenSearchHost = 'opensearch-node1';
-$wgSupportSystemOpenSearchPort = 9200;
-$wgSupportSystemOpenSearchIndex = 'solutions';
-$wgSupportSystemRedmineAPIKey = 'e0d62b7b9695048dd4a4d44bbc9f074c865fcf2f';
-$wgSupportSystemRedmineURL = getenv('REDMINE_URL') ?: 'http://redmine:3000';
-$wgSupportSystemAIServiceURL = getenv('AI_SERVICE_URL') ?: 'http://ai-service:5000';
-$wgSupportSystemGraphDataFile = '/var/www/html/extensions/SupportSystem/data/graph_data.json';
-
-
-$wgCirrusSearchIndexBaseName = 'mediawiki';
-$wgCirrusSearchUseElasticaSerializer = 5;
-$wgCirrusSearchClientSideSearchTimeout = [
-    'default' => 60,
-];
-$wgSearchType = 'CirrusSearch';
-$wgCirrusSearchServers = [
-    [
-        'host' => 'opensearch-node1',
-        'port' => 9200,
-        'transport' => 'Http',
-        'path' => '',
-        'schema' => 'http'
-    ]
-];
-
-$wgSupportSystemAIServiceURL = 'http://ai-service:5000';
+$wgDefaultSkin = "timeless";
 
 # Enabled skins.
 # The following skins were automatically enabled:
-wfLoadSkin('MinervaNeue');
-wfLoadSkin('MonoBook');
-wfLoadSkin('Timeless');
-wfLoadSkin('Vector');
+wfLoadSkin( 'MinervaNeue' );
+wfLoadSkin( 'MonoBook' );
+wfLoadSkin( 'Timeless' );
+wfLoadSkin( 'Vector' );
 
+$wgShowExceptionDetails = true;
+$wgSupportSystemRedmineAPIKey = 'a02d08a61c2ff8f7484f9f999a07b989d9d724c0';
+$wgSupportSystemRedmineURL = getenv('REDMINE_URL') ?: 'http://redmine:3000';
+$wgSupportSystemGraphDataFile = '/var/www/html/extensions/SupportSystem/data/graph_data.json';
+
+$wgSearchType = 'CirrusSearch';
+$wgCirrusSearchServers = [
+	'http://opensearch-node1:9200',
+	'http://opensearch-node2:9200'
+];
+
+# Enabled extensions. Most of the extensions are enabled by adding
+# wfLoadExtension( 'ExtensionName' );
+# to LocalSettings.php. Check specific extension documentation for more details.
+# The following extensions were automatically enabled:
+wfLoadExtension( 'AdvancedSearch' );
+wfLoadExtension( 'CirrusSearch' );
+wfLoadExtension( 'Echo' );
+wfLoadExtension( 'Elastica' );
+wfLoadExtension( 'PdfHandler' );
+wfLoadExtension( 'SupportSystem' );
+wfLoadExtension( 'SyntaxHighlight_GeSHi' );
+wfLoadExtension( 'TimedMediaHandler' );
+wfLoadExtension( 'VisualEditor' );
+wfLoadExtension('Validator');
+wfLoadExtension('SemanticMediaWiki');
+enableSemantics('localhost:8080');
+$smwgPageSpecialProperties[] = '_MDAT';
+$smwgPageSpecialProperties[] = '_CDAT';
+$smwgPageSpecialProperties[] = '_NEWP';
+$smwgPageSpecialProperties[] = '_LEDT';
+$smwgQMaxInlineLimit = 500;
+$smwgQMaxLimit = 10000;
+$smwgQMaxSize = 100;
+$smwgQMaxDepth = 10;
+wfLoadExtension('SemanticResultFormats');
+wfLoadExtension('SemanticDrilldown');
+wfLoadExtension('SemanticWatchlist');
+wfLoadExtension('SemanticTasks');
+wfLoadExtension('SemanticCite');
+wfLoadExtension('SemanticGlossary');
+
+# ===== LDAP РАСШИРЕНИЯ (ДЛЯ БУДУЩЕГО ИСПОЛЬЗОВАНИЯ) =====
+# PluggableAuth - базовое расширение для LDAP
+#wfLoadExtension('PluggableAuth');
+#$wgPluggableAuth_EnableAutoLogin = false;
+#$wgPluggableAuth_EnableLocalLogin = true;
+# LDAPProvider - базовый провайдер LDAP
+#wfLoadExtension('LDAPProvider');
+# LDAPAuthentication2
+#wfLoadExtension('LDAPAuthentication2');
+# LDAPAuthorization
+#wfLoadExtension('LDAPAuthorization');
+# LDAPGroups
+#wfLoadExtension('LDAPGroups');
+# LDAPUserInfo
+#wfLoadExtension('LDAPUserInfo');
+# LDAPSyncAll
+#wfLoadExtension('LDAPSyncAll');
+# Конфигурация LDAP (закомментирована для локальной разработки)
+#$LDAPProviderDomainConfigProvider = function() {
+#    $config = [
+#        'example.com' => [
+#            'connection' => [
+#                'server' => 'ldap.example.com',
+#                'port' => 389,
+#                'enctype' => 'clear',
+#                'options' => [
+#                    'LDAP_OPT_DEREF' => 1
+#                ],
+#                'basedn' => 'dc=example,dc=com',
+#                'userbasedn' => 'ou=users,dc=example,dc=com',
+#                'groupbasedn' => 'ou=groups,dc=example,dc=com',
+#                'searchattribute' => 'uid',
+#                'usernameattribute' => 'uid',
+#                'realnameattribute' => 'cn',
+#                'emailattribute' => 'mail',
+#            ]
+#        ]
+#    ];
+#    return new \MediaWiki\Extension\LDAPProvider\DomainConfigProvider\InlinePHPArray( $config );
+#};
+
+# ===== РАСШИРЕНИЯ ОТ LVEFUNC =====
+wfLoadExtension('MiniORM');
+wfLoadExtension('Workflows');
+wfLoadExtension('Review');
+
+wfLoadExtension('CodeMirror');
+$wgDefaultUserOptions['usecodemirror'] = 1;
+wfLoadExtension('CategoryTree');
+wfLoadExtension('InputBox');
+wfLoadExtension('PageForms');
+wfLoadExtension('EmbedVideo');
+
+# ===== ДОПОЛНИТЕЛЬНЫЕ НАСТРОЙКИ =====
+$wgMaxArticleSize = 2048;
+$wgFileExtensions = [
+	'png',
+	'gif',
+	'jpg',
+	'jpeg',
+	'pdf',
+	'doc',
+	'docx',
+	'xls',
+	'xlsx',
+	'ppt',
+	'pptx',
+	'odt',
+	'ods',
+	'odp',
+	'odg',
+	'mp4',
+	'webm',
+	'ogv',
+	'mp3',
+	'ogg',
+	'wav'
+];
+$wgUploadSizeWarning = 100 * 1024 * 1024; # 100MB
+$wgMaxUploadSize = 100 * 1024 * 1024; # 100MB
+$wgJobRunRate = 0.01;
+$wgResourceLoaderMaxage = [
+	'versioned' => 30 * 24 * 60 * 60, // 30 days
+	'unversioned' => 5 * 60 // 5 minutes
+];
+$wgShowExceptionDetails = true;
+$wgDebugToolbar = true;
+$wgShowDebug = false;
+$wgDevelopmentWarnings = true;
 
 # End of automatically generated settings.
 # Add more configuration options below.
-
-# Load the SupportSystem extension
-wfLoadExtension('SupportSystem');
-wfLoadExtension('Elastica');
-wfLoadExtension('CirrusSearch');
-wfLoadExtension('SyntaxHighlight_GeSHi');
-wfLoadExtension('AdvancedSearch');
-wfLoadExtension('Echo');
-wfLoadExtension('PdfHandler');
-wfLoadExtension('TimedMediaHandler');
-wfLoadExtension('VisualEditor');
