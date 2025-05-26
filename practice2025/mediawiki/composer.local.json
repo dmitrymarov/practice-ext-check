@@ -1,15 +1,14 @@
 {
     "require": {
-        "mediawiki/semantic-media-wiki": "~5.0",
-        "mediawiki/semantic-result-formats": "~4.2",
+        "mediawiki/semantic-media-wiki": "~3.1",
+        "mediawiki/semantic-result-formats": "~3.1",
         "mediawiki/semantic-compound-queries": "~2.2",
         "mediawiki/maps": "~10.1",
         "mediawiki/page-forms": "~5.6",
         "mediawiki/lingo": "~3.1",
         "mediawiki/semantic-glossary": "~4.0",
-        "elasticsearch/elasticsearch": "^7.0",
+        "elasticsearch/elasticsearch": "6.8.4",
         "jeroen/file-fetcher": "~6.0",
-        "jeroen/http-foundation": "~1.0",
         "data-values/data-values": "~3.0",
         "data-values/common": "~1.0",
         "data-values/geo": "~4.3",

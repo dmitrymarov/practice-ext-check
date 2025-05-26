@@ -11,7 +11,7 @@ services:
     volumes:
       - ./mediawiki/extensions:/var/www/html/extensions
       - ./mediawiki/scripts/:/var/www/html/scripts
-      # - ./mediawiki/LocalSettings.php:/var/www/html/LocalSettings.php
+      - ./mediawiki/LocalSettings.php:/var/www/html/LocalSettings.php
       - ./mediawiki/composer.local.json:/var/www/html/composer.local.json
     command: >
       bash -lc "
