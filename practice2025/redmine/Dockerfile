@@ -10,18 +10,23 @@ RUN apt-get update && apt-get install -y \
     unzip \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /usr/src/redmine/plugins
+COPY ./plugins/helpdesk \
+    /usr/src/redmine/plugins/redmine_helpdesk
 
-# Install plugins
-RUN git clone https://github.com/jfqd/redmine_helpdesk.git redmine_helpdesk || echo "Helpdesk plugin installation failed"
-RUN git clone https://github.com/keeleysam/redmine_monitoring_controlling.git redmine_monitoring_controlling || echo "Monitoring plugin installation failed"
-RUN git clone https://github.com/akiko-pusu/redmine_theme_changer.git redmine_theme_changer || echo "Theme changer plugin installation failed"
-RUN git clone https://github.com/alphanodes/additionals.git redmine_additionals || echo "Additionals plugin installation failed"
-RUN git clone https://github.com/two-pack/redmine_xlsx_format_issue_exporter.git redmine_xlsx_format_issue_exporter || echo "XLSX exporter plugin installation failed"
+COPY ./plugins/monitoring_controlling \
+    /usr/src/redmine/plugins/redmine_monitoring_controlling
+
+COPY ./plugins/additionals \
+    /usr/src/redmine/plugins/additionals
 
 RUN chown -R redmine:redmine /usr/src/redmine/plugins
 
+RUN chown -R redmine:redmine /usr/src/redmine
+
 USER redmine
 WORKDIR /usr/src/redmine
-
-RUN bundle install --without development test || echo "Bundle install completed with warnings"
+RUN sed -i "s/i18n (~> 1\\.10\\.0)/i18n (~> 1\\.14)/" Gemfile
+RUN bundle config set --local without 'development test' \
+    && bundle config set --local silence_root_warning 1
+RUN bundle install --jobs 4 --retry 3 \
+    && bundle exec rake redmine:plugins:migrate RAILS_ENV=production

@@ -1,5 +1,60 @@
 {
     "require": {
-        "mediawiki/semantic-media-wiki": "~5.0"
+        "mediawiki/semantic-media-wiki": "~5.0",
+        "mediawiki/semantic-result-formats": "~4.2",
+        "mediawiki/semantic-compound-queries": "~2.2",
+        "mediawiki/maps": "~10.1",
+        "mediawiki/page-forms": "~5.6",
+        "mediawiki/lingo": "~3.1",
+        "mediawiki/semantic-glossary": "~4.0",
+        "elasticsearch/elasticsearch": "^7.0",
+        "jeroen/file-fetcher": "~6.0",
+        "jeroen/http-foundation": "~1.0",
+        "data-values/data-values": "~3.0",
+        "data-values/common": "~1.0",
+        "data-values/geo": "~4.3",
+        "data-values/number": "~0.11",
+        "data-values/time": "~1.1",
+        "onoi/shared-resources": "~0.4",
+        "onoi/message-reporter": "~1.4",
+        "onoi/event-dispatcher": "~1.1",
+        "onoi/callback-container": "~2.0",
+        "justinrainbow/json-schema": "^5.2",
+        "seld/jsonlint": "^1.7",
+        "wikimedia/composer-merge-plugin": "^2.0"
+    },
+    "extra": {
+        "merge-plugin": {
+            "include": [
+                "extensions/*/composer.json",
+                "skins/*/composer.json"
+            ]
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "wikimedia/composer-merge-plugin": true,
+            "composer/installers": true,
+            "mediawiki/mediawiki-codesniffer": true
+        },
+        "platform": {
+            "php": "7.4.33"
+        },
+        "optimize-autoloader": true,
+        "apcu-autoloader": true
+    },
+    "scripts": {
+        "post-install-cmd": [
+            "@composer mw-install"
+        ],
+        "post-update-cmd": [
+            "@composer mw-update"
+        ],
+        "mw-install": [
+            "[ -f vendor/bin/validate-json ] && vendor/bin/validate-json extension.json || true"
+        ],
+        "mw-update": [
+            "[ -f vendor/bin/validate-json ] && vendor/bin/validate-json extension.json || true"
+        ]
     }
 }
