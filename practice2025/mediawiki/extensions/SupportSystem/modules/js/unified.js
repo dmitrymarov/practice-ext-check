@@ -1097,21 +1097,61 @@ var selectedSource = '';
             return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
         }
     }
+    function displayNode(node) {
+        const chatContainer = document.getElementById('support-chat-container');
+        const nodeElement = document.createElement('div');
+        nodeElement.className = 'support-node support-node-' + node.type;
+        const contentElement = document.createElement('div');
+        contentElement.className = 'support-node-content';
+        contentElement.textContent = node.content;
+        nodeElement.appendChild(contentElement);
+        if (node.type === 'solution' && node.article_link) {
+            const articleLinkContainer = document.createElement('div');
+            articleLinkContainer.className = 'support-article-links';
+            const mainLink = document.createElement('a');
+            mainLink.href = node.article_url || '/wiki/' + node.article_link.replace(/ /g, '_');
+            mainLink.className = 'support-article-link-button';
+            mainLink.textContent = mw.msg('supportsystem-read-full-article');
+            mainLink.target = '_blank';
+            articleLinkContainer.appendChild(mainLink);
+            if (node.related_articles && node.related_articles.length > 0) {
+                const relatedHeader = document.createElement('div');
+                relatedHeader.className = 'support-related-header';
+                relatedHeader.textContent = mw.msg('supportsystem-related-articles');
+                articleLinkContainer.appendChild(relatedHeader);
+                const relatedList = document.createElement('ul');
+                relatedList.className = 'support-related-list';
+                node.related_articles.forEach(function (article) {
+                    const li = document.createElement('li');
+                    const link = document.createElement('a');
+                    link.href = '/wiki/' + article.replace(/ /g, '_');
+                    link.textContent = article.replace(/_/g, ' ');
+                    link.target = '_blank';
+                    li.appendChild(link);
+                    relatedList.appendChild(li);
+                });
+                articleLinkContainer.appendChild(relatedList);
+            }
 
-    /**
-     * Экранирование HTML-символов
-     * @param {string} str Строка для экранирования
-     * @return {string} Экранированная строка
-     */
-    function escapeHtml(str) {
-        return str
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
+            nodeElement.appendChild(articleLinkContainer);
+        }
+        if (node.children && node.children.length > 0) {
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'support-options';
+
+            node.children.forEach(function (child) {
+                const button = document.createElement('button');
+                button.className = 'support-option-button';
+                button.textContent = child.label;
+                button.onclick = function () {
+                    loadNode(child.id);
+                };
+                optionsContainer.appendChild(button);
+            });
+            nodeElement.appendChild(optionsContainer);
+        }
+        chatContainer.appendChild(nodeElement);
     }
-
     /**
      * Экранирование символов регулярных выражений
      * @param {string} str Строка для экранирования

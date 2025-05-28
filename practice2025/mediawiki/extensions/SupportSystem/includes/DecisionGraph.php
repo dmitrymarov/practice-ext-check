@@ -164,23 +164,37 @@ class DecisionGraph
      * @return array
      */
     public function getChildren(string $nodeId): array
-    {
-        $children = [];
-        foreach ($this->graph['edges'] as $edge) {
-            if ($edge['source'] === $nodeId) {
-                $targetNode = $this->getNode($edge['target']);
-                if ($targetNode) {
-                    $children[] = [
-                        'id' => $targetNode['id'],
-                        'content' => $targetNode['content'],
-                        'type' => $targetNode['type'],
-                        'label' => $edge['label'] ?? ''
-                    ];
+{
+    $children = [];
+    foreach ($this->graph['edges'] as $edge) {
+        if ($edge['source'] === $nodeId) {
+            $targetNode = $this->getNode($edge['target']);
+            if ($targetNode) {
+                $child = [
+                    'id' => $targetNode['id'],
+                    'content' => $targetNode['content'],
+                    'type' => $targetNode['type'],
+                    'label' => $edge['label'] ?? ''
+                ];
+                
+                // Добавляем информацию о связанной статье
+                if (isset($targetNode['article_link'])) {
+                    $child['article_link'] = $targetNode['article_link'];
+                    $child['article_url'] = $targetNode['article_url'] ?? 
+                        '/wiki/' . str_replace(' ', '_', $targetNode['article_link']);
                 }
+                
+                // Добавляем связанные статьи, если есть
+                if (isset($targetNode['related_articles'])) {
+                    $child['related_articles'] = $targetNode['related_articles'];
+                }
+                
+                $children[] = $child;
             }
         }
-        return $children;
     }
+    return $children;
+}
     
     /**
      * Add a new node to the graph

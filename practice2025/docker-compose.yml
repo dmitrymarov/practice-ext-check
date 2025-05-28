@@ -54,8 +54,8 @@ services:
     environment:
       - cluster.name=opensearch-cluster
       - node.name=opensearch-node1
-      - discovery.seed_hosts=opensearch-node1,opensearch-node2
-      - cluster.initial_cluster_manager_nodes=opensearch-node1,opensearch-node2
+      - discovery.seed_hosts=opensearch-node1
+      - cluster.initial_cluster_manager_nodes=opensearch-node1
       - bootstrap.memory_lock=true
       - "OPENSEARCH_JAVA_OPTS=-Xms256m -Xmx256m"
       - OPENSEARCH_INITIAL_ADMIN_PASSWORD=Asuadmin123!
@@ -76,39 +76,13 @@ services:
     networks:
       - support_net
 
-  opensearch-node2:
-    image: opensearchproject/opensearch:latest
-    container_name: support-opensearch2
-    environment:
-      - cluster.name=opensearch-cluster
-      - node.name=opensearch-node2
-      - discovery.seed_hosts=opensearch-node1,opensearch-node2
-      - cluster.initial_cluster_manager_nodes=opensearch-node1,opensearch-node2
-      - bootstrap.memory_lock=true
-      - "OPENSEARCH_JAVA_OPTS=-Xms256m -Xmx256m"
-      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=Asuadmin123!
-      - plugins.security.ssl.http.enabled=false
-      - plugins.security.disabled=true
-      - compatibility.override_main_response_version=true
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-      nofile:
-        soft: 65536
-        hard: 65536
-    volumes:
-      - opensearch_data2:/usr/share/opensearch/data
-    networks:
-      - support_net
-
   opensearch-dashboards:
     image: opensearchproject/opensearch-dashboards:latest
     container_name: support-opensearch-dashboards
     ports:
       - 5601:5601
     environment:
-      OPENSEARCH_HOSTS: '["http://opensearch-node1:9200","http://opensearch-node2:9200"]'
+      OPENSEARCH_HOSTS: '["http://opensearch-node1:9200"]'
       DISABLE_SECURITY_DASHBOARDS_PLUGIN: true
     networks:
       - support_net
@@ -161,6 +135,5 @@ volumes:
   postgres_mediawiki_data:
   postgres_redmine_data:
   opensearch_data1:
-  opensearch_data2:
   redmine_data:
   redmine_plugins:
